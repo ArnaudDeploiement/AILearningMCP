@@ -79,3 +79,36 @@ CREATE TABLE IF NOT EXISTS scheduled_alerts (
     sent          INTEGER DEFAULT 0,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS oauth_codes (
+    code           TEXT PRIMARY KEY,
+    learner_id     TEXT NOT NULL REFERENCES learners(id),
+    code_challenge TEXT NOT NULL,
+    expires_at     DATETIME NOT NULL,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id      TEXT PRIMARY KEY,
+    client_name    TEXT DEFAULT '',
+    redirect_uris  TEXT DEFAULT '[]',
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_concept_states_learner
+    ON concept_states(learner_id);
+
+CREATE INDEX IF NOT EXISTS idx_concept_states_review
+    ON concept_states(learner_id, next_review);
+
+CREATE INDEX IF NOT EXISTS idx_interactions_learner_created
+    ON interactions(learner_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_interactions_learner_concept
+    ON interactions(learner_id, concept, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_alerts_learner_type
+    ON scheduled_alerts(learner_id, alert_type, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires
+    ON oauth_codes(expires_at);
