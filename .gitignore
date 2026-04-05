@@ -1,0 +1,16 @@
+# Secrets
+*.jwt_secret
+..jwt_secret
+.env
+
+# Database
+data/
+*.db
+
+# Binary
+learning-runtime
+
+# IDE
+.idea/
+.vscode/
+*.swp
