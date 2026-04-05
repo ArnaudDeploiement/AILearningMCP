@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS domains (
     id            TEXT PRIMARY KEY,
     learner_id    TEXT NOT NULL REFERENCES learners(id),
     name          TEXT NOT NULL,
+    personal_goal TEXT DEFAULT '',
     graph_json    TEXT NOT NULL,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,6 +60,10 @@ CREATE TABLE IF NOT EXISTS interactions (
     confidence    REAL,
     error_type    TEXT DEFAULT '',
     notes         TEXT,
+    hints_requested    INTEGER DEFAULT 0,
+    self_initiated     INTEGER DEFAULT 0,
+    calibration_id     TEXT DEFAULT '',
+    is_proactive_review INTEGER DEFAULT 0,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -158,5 +163,5 @@ CREATE INDEX IF NOT EXISTS idx_calibration_records_learner
 CREATE INDEX IF NOT EXISTS idx_transfer_records_learner_concept
     ON transfer_records(learner_id, concept_id, created_at);
 
-CREATE INDEX IF NOT EXISTS idx_interactions_self_initiated
-    ON interactions(learner_id, self_initiated, created_at);
+-- idx_interactions_self_initiated is created in idempotent migrations
+-- (must run after ALTER TABLE adds the self_initiated column)
