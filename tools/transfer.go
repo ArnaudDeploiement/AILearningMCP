@@ -1,0 +1,123 @@
+package tools
+
+import (
+	"context"
+	"fmt"
+
+	"learning-runtime/algorithms"
+	"learning-runtime/models"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+type TransferChallengeParams struct {
+	ConceptID   string `json:"concept_id" jsonschema:"Le concept a tester en transfert"`
+	ContextType string `json:"context_type,omitempty" jsonschema:"Type de contexte: real_world, interview, teaching, debugging, creative (optionnel)"`
+	DomainID    string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
+}
+
+func registerTransferChallenge(server *mcp.Server, deps *Deps) {
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "transfer_challenge",
+		Description: "Genere une situation inedite pour tester le transfert d'un concept maitrise hors du contexte initial.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, params TransferChallengeParams) (*mcp.CallToolResult, any, error) {
+		learnerID, err := getLearnerID(ctx)
+		if err != nil {
+			r, _ := errorResult(err.Error())
+			return r, nil, nil
+		}
+
+		if params.ConceptID == "" {
+			r, _ := errorResult("concept_id is required")
+			return r, nil, nil
+		}
+
+		cs, err := deps.Store.GetConceptState(learnerID, params.ConceptID)
+		if err != nil {
+			r, _ := errorResult(fmt.Sprintf("concept not found: %v", err))
+			return r, nil, nil
+		}
+
+		bktState := algorithms.BKTState{PMastery: cs.PMastery}
+		if !algorithms.BKTIsMastered(bktState) {
+			r, _ := jsonResult(map[string]interface{}{
+				"eligible": false,
+				"mastery":  cs.PMastery,
+				"message":  "Concept pas encore maitrise. Le transfert challenge requiert BKT >= 0.85.",
+			})
+			return r, nil, nil
+		}
+
+		contextType := params.ContextType
+		if contextType == "" {
+			contextType = "real_world"
+		}
+
+		existingTransfers, _ := deps.Store.GetTransferScores(learnerID, params.ConceptID)
+		var testedContexts []string
+		for _, tr := range existingTransfers {
+			testedContexts = append(testedContexts, fmt.Sprintf("%s (%.0f%%)", tr.ContextType, tr.Score*100))
+		}
+
+		promptText := fmt.Sprintf(
+			"Genere une situation totalement nouvelle qui teste le transfert du concept '%s' "+
+				"dans un contexte de type '%s'. "+
+				"La situation ne doit PAS ressembler aux exercices precedents. "+
+				"L'objectif: verifier que l'apprenant peut appliquer ce concept dans un contexte qu'il n'a jamais vu.\n\n"+
+				"Apres la reponse de l'apprenant, evalue le transfer_score (0-1) et "+
+				"appelle record_transfer_result avec le resultat.",
+			params.ConceptID, contextType,
+		)
+
+		r, _ := jsonResult(map[string]interface{}{
+			"eligible":        true,
+			"concept_id":      params.ConceptID,
+			"context_type":    contextType,
+			"prompt_text":     promptText,
+			"tested_contexts": testedContexts,
+		})
+		return r, nil, nil
+	})
+}
+
+// ─── record_transfer_result ─────────────────────────────────────────────────
+
+type RecordTransferResultParams struct {
+	ConceptID   string  `json:"concept_id" jsonschema:"Le concept teste"`
+	ContextType string  `json:"context_type" jsonschema:"Type de contexte du challenge"`
+	Score       float64 `json:"score" jsonschema:"Score de transfert entre 0 et 1"`
+	SessionID   string  `json:"session_id,omitempty" jsonschema:"ID de session (optionnel)"`
+}
+
+func registerRecordTransferResult(server *mcp.Server, deps *Deps) {
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "record_transfer_result",
+		Description: "Enregistre le resultat d'un transfer challenge.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordTransferResultParams) (*mcp.CallToolResult, any, error) {
+		learnerID, err := getLearnerID(ctx)
+		if err != nil {
+			r, _ := errorResult(err.Error())
+			return r, nil, nil
+		}
+
+		record := &models.TransferRecord{
+			LearnerID:   learnerID,
+			ConceptID:   params.ConceptID,
+			ContextType: params.ContextType,
+			Score:       params.Score,
+			SessionID:   params.SessionID,
+		}
+
+		if err := deps.Store.CreateTransferRecord(record); err != nil {
+			r, _ := errorResult(fmt.Sprintf("failed to record transfer: %v", err))
+			return r, nil, nil
+		}
+
+		r, _ := jsonResult(map[string]interface{}{
+			"recorded":       true,
+			"transfer_score": params.Score,
+			"blocked":        params.Score < 0.50,
+		})
+		return r, nil, nil
+	})
+}
