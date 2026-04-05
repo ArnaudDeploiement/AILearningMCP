@@ -61,9 +61,13 @@ type Interaction struct {
 	Success      bool
 	ResponseTime int
 	Confidence   float64
-	ErrorType    string
-	Notes        string
-	CreatedAt    time.Time
+	ErrorType         string
+	Notes             string
+	HintsRequested    int
+	SelfInitiated     bool
+	CalibrationID     string
+	IsProactiveReview bool
+	CreatedAt         time.Time
 }
 
 type RefreshToken struct {

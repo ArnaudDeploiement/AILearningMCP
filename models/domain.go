@@ -9,7 +9,11 @@ const (
 	AlertPlateau      AlertType = "PLATEAU"
 	AlertZPDDrift     AlertType = "ZPD_DRIFT"
 	AlertOverload     AlertType = "OVERLOAD"
-	AlertMasteryReady AlertType = "MASTERY_READY"
+	AlertMasteryReady            AlertType = "MASTERY_READY"
+	AlertDependencyIncreasing    AlertType = "DEPENDENCY_INCREASING"
+	AlertCalibrationDiverging    AlertType = "CALIBRATION_DIVERGING"
+	AlertAffectNegative          AlertType = "AFFECT_NEGATIVE"
+	AlertTransferBlocked         AlertType = "TRANSFER_BLOCKED"
 )
 
 type AlertUrgency string
@@ -59,11 +63,12 @@ type KnowledgeSpace struct {
 }
 
 type Domain struct {
-	ID        string
-	LearnerID string
-	Name      string
-	Graph     KnowledgeSpace
-	CreatedAt time.Time
+	ID           string
+	LearnerID    string
+	Name         string
+	PersonalGoal string
+	Graph        KnowledgeSpace
+	CreatedAt    time.Time
 }
 
 type TimeWindow struct {
