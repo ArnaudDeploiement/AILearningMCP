@@ -1,0 +1,201 @@
+package engine
+
+import (
+	"testing"
+	"time"
+
+	"learning-runtime/models"
+)
+
+func TestComputeAutonomyMetrics(t *testing.T) {
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name    string
+		input   AutonomyInput
+		wantMin float64
+		wantMax float64
+	}{
+		{
+			name: "all self-initiated, perfect calibration, no hints, all proactive",
+			input: AutonomyInput{
+				Interactions:    makeInteractions(10, true, true, 0, true, now),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.9}},
+				CalibrationBias: 0.0,
+				SessionGap:      2 * time.Hour,
+			},
+			wantMin: 0.9,
+			wantMax: 1.0,
+		},
+		{
+			name: "no initiative, poor calibration, heavy hints, no proactive",
+			input: AutonomyInput{
+				Interactions:    makeInteractions(10, false, false, 3, false, now),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.9}},
+				CalibrationBias: 1.5,
+				SessionGap:      2 * time.Hour,
+			},
+			wantMin: 0.0,
+			wantMax: 0.15,
+		},
+		{
+			name: "empty interactions",
+			input: AutonomyInput{
+				Interactions:    nil,
+				ConceptStates:   nil,
+				CalibrationBias: 0.0,
+				SessionGap:      2 * time.Hour,
+			},
+			wantMin: 0.0,
+			wantMax: 0.55,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ComputeAutonomyMetrics(tt.input)
+			if got.Score < tt.wantMin || got.Score > tt.wantMax {
+				t.Errorf("Score = %.2f, want [%.2f, %.2f]", got.Score, tt.wantMin, tt.wantMax)
+			}
+		})
+	}
+}
+
+func TestGroupIntoSessions(t *testing.T) {
+	now := time.Now().UTC()
+	interactions := []*models.Interaction{
+		{CreatedAt: now.Add(-5 * time.Hour)},
+		{CreatedAt: now.Add(-4 * time.Hour)},
+		{CreatedAt: now.Add(-1 * time.Hour)},
+		{CreatedAt: now.Add(-30 * time.Minute)},
+	}
+
+	sessions := groupIntoSessions(interactions, 2*time.Hour)
+	if len(sessions) != 2 {
+		t.Errorf("got %d sessions, want 2", len(sessions))
+	}
+}
+
+func TestComputeAutonomyTrend(t *testing.T) {
+	tests := []struct {
+		name   string
+		scores []float64
+		want   string
+	}{
+		{"improving", []float64{0.3, 0.4, 0.5, 0.6, 0.7, 0.5, 0.4, 0.3, 0.2, 0.1}, "improving"},
+		{"declining", []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.8, 0.8, 0.9, 0.9}, "declining"},
+		{"stable", []float64{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5}, "stable"},
+		{"too few", []float64{0.5}, "stable"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeAutonomyTrend(tt.scores)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDetectMirrorPattern(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   MirrorInput
+		wantNil bool
+		wantPat string
+	}{
+		{
+			name: "hint_overuse detected",
+			input: MirrorInput{
+				Interactions:    makeInteractions(15, true, false, 3, true, time.Now().UTC()),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.9}},
+				AutonomyScores:  []float64{0.5, 0.5, 0.5},
+				CalibrationBias: 0.0,
+				SessionCount:    5,
+			},
+			wantNil: false,
+			wantPat: "hint_overuse",
+		},
+		{
+			name: "no pattern — too few sessions",
+			input: MirrorInput{
+				Interactions:    makeInteractions(5, true, false, 0, true, time.Now().UTC()),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.5}},
+				AutonomyScores:  []float64{0.5, 0.5},
+				CalibrationBias: 0.0,
+				SessionCount:    2,
+			},
+			wantNil: true,
+		},
+		{
+			name: "dependency_increasing detected",
+			input: MirrorInput{
+				Interactions:    makeInteractions(10, false, false, 0, true, time.Now().UTC()),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.5}},
+				AutonomyScores:  []float64{0.4, 0.5, 0.6},
+				CalibrationBias: 0.0,
+				SessionCount:    5,
+			},
+			wantNil: false,
+			wantPat: "dependency_increasing",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DetectMirrorPattern(tt.input)
+			if tt.wantNil && got != nil {
+				t.Errorf("expected nil, got %+v", got)
+			}
+			if !tt.wantNil && got == nil {
+				t.Errorf("expected pattern %s, got nil", tt.wantPat)
+			}
+			if !tt.wantNil && got != nil && got.Pattern != tt.wantPat {
+				t.Errorf("got pattern %q, want %q", got.Pattern, tt.wantPat)
+			}
+		})
+	}
+}
+
+func TestComputeTutorMode(t *testing.T) {
+	tests := []struct {
+		name   string
+		affect *models.AffectState
+		alerts []models.Alert
+		want   string
+	}{
+		{"normal — no affect", nil, nil, "normal"},
+		{"scaffolding — anxious", &models.AffectState{SubjectConfidence: 1}, nil, "scaffolding"},
+		{"lighter — fatigued", &models.AffectState{Energy: 1, SubjectConfidence: 3}, nil, "lighter"},
+		{"lighter — affect negative frustration", &models.AffectState{Energy: 2, Satisfaction: 1}, []models.Alert{{Type: models.AlertAffectNegative}}, "lighter"},
+		{"recontextualize — bored", &models.AffectState{Energy: 4, Satisfaction: 1}, []models.Alert{{Type: models.AlertAffectNegative}}, "recontextualize"},
+		{"normal — happy", &models.AffectState{Energy: 3, SubjectConfidence: 3, Satisfaction: 3}, nil, "normal"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ComputeTutorMode(tt.affect, tt.alerts)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func makeInteractions(n int, selfInitiated bool, proactive bool, hints int, success bool, baseTime time.Time) []*models.Interaction {
+	var interactions []*models.Interaction
+	for i := 0; i < n; i++ {
+		interactions = append(interactions, &models.Interaction{
+			LearnerID:         "test",
+			Concept:           "A",
+			ActivityType:      "RECALL_EXERCISE",
+			Success:           success,
+			HintsRequested:    hints,
+			SelfInitiated:     selfInitiated,
+			IsProactiveReview: proactive,
+			CreatedAt:         baseTime.Add(-time.Duration(n-i) * 30 * time.Minute),
+		})
+	}
+	return interactions
+}
