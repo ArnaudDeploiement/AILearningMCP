@@ -421,13 +421,17 @@ func (s *Store) GetConceptStatesByLearner(learnerID string) ([]*models.ConceptSt
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
 
+const interactionCols = `id, learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, hints_requested, self_initiated, calibration_id, is_proactive_review, created_at`
+
 func (s *Store) CreateInteraction(i *models.Interaction) error {
 	i.CreatedAt = time.Now().UTC()
 	result, err := s.db.Exec(
-		`INSERT INTO interactions (learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO interactions (learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, hints_requested, self_initiated, calibration_id, is_proactive_review, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		i.LearnerID, i.Concept, i.ActivityType, boolToInt(i.Success),
-		i.ResponseTime, i.Confidence, i.ErrorType, i.Notes, i.CreatedAt,
+		i.ResponseTime, i.Confidence, i.ErrorType, i.Notes,
+		i.HintsRequested, boolToInt(i.SelfInitiated), i.CalibrationID, boolToInt(i.IsProactiveReview),
+		i.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("create interaction: %w", err)
@@ -442,8 +446,7 @@ func (s *Store) CreateInteraction(i *models.Interaction) error {
 
 func (s *Store) GetRecentInteractions(learnerID, concept string, limit int) ([]*models.Interaction, error) {
 	rows, err := s.db.Query(
-		`SELECT id, learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, created_at
-		 FROM interactions WHERE learner_id = ? AND concept = ?
+		`SELECT `+interactionCols+` FROM interactions WHERE learner_id = ? AND concept = ?
 		 ORDER BY created_at DESC LIMIT ?`,
 		learnerID, concept, limit,
 	)
@@ -456,8 +459,7 @@ func (s *Store) GetRecentInteractions(learnerID, concept string, limit int) ([]*
 
 func (s *Store) GetRecentInteractionsByLearner(learnerID string, limit int) ([]*models.Interaction, error) {
 	rows, err := s.db.Query(
-		`SELECT id, learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, created_at
-		 FROM interactions WHERE learner_id = ?
+		`SELECT `+interactionCols+` FROM interactions WHERE learner_id = ?
 		 ORDER BY created_at DESC LIMIT ?`,
 		learnerID, limit,
 	)
@@ -471,8 +473,7 @@ func (s *Store) GetRecentInteractionsByLearner(learnerID string, limit int) ([]*
 func (s *Store) GetSessionInteractions(learnerID string) ([]*models.Interaction, error) {
 	cutoff := time.Now().UTC().Add(-2 * time.Hour)
 	rows, err := s.db.Query(
-		`SELECT id, learner_id, concept, activity_type, success, response_time, confidence, error_type, notes, created_at
-		 FROM interactions WHERE learner_id = ? AND created_at > ?
+		`SELECT `+interactionCols+` FROM interactions WHERE learner_id = ? AND created_at > ?
 		 ORDER BY created_at DESC`,
 		learnerID, cutoff,
 	)
@@ -487,21 +488,40 @@ func scanInteractions(rows *sql.Rows) ([]*models.Interaction, error) {
 	var interactions []*models.Interaction
 	for rows.Next() {
 		i := &models.Interaction{}
-		var successInt int
-		var errorType sql.NullString
+		var successInt, selfInitInt, proactiveInt int
+		var errorType, calibrationID sql.NullString
 		if err := rows.Scan(
 			&i.ID, &i.LearnerID, &i.Concept, &i.ActivityType,
-			&successInt, &i.ResponseTime, &i.Confidence, &errorType, &i.Notes, &i.CreatedAt,
+			&successInt, &i.ResponseTime, &i.Confidence, &errorType, &i.Notes,
+			&i.HintsRequested, &selfInitInt, &calibrationID, &proactiveInt,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan interaction row: %w", err)
 		}
 		i.Success = successInt != 0
+		i.SelfInitiated = selfInitInt != 0
+		i.IsProactiveReview = proactiveInt != 0
 		if errorType.Valid {
 			i.ErrorType = errorType.String
+		}
+		if calibrationID.Valid {
+			i.CalibrationID = calibrationID.String
 		}
 		interactions = append(interactions, i)
 	}
 	return interactions, rows.Err()
+}
+
+func (s *Store) GetInteractionsSince(learnerID string, since time.Time) ([]*models.Interaction, error) {
+	rows, err := s.db.Query(
+		`SELECT `+interactionCols+` FROM interactions WHERE learner_id = ? AND created_at >= ? ORDER BY created_at ASC`,
+		learnerID, since,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get interactions since: %w", err)
+	}
+	defer rows.Close()
+	return scanInteractions(rows)
 }
 
 func (s *Store) GetSessionStart(learnerID string) (time.Time, error) {
