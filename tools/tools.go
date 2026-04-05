@@ -28,7 +28,14 @@ func getLearnerID(ctx context.Context) (string, error) {
 // resolveDomain resolves a domain by ID or falls back to the learner's most recent domain.
 func resolveDomain(store *db.Store, learnerID, domainID string) (*models.Domain, error) {
 	if domainID != "" {
-		return store.GetDomainByID(domainID)
+		d, err := store.GetDomainByID(domainID)
+		if err != nil {
+			return nil, err
+		}
+		if d.LearnerID != learnerID {
+			return nil, fmt.Errorf("domain not found")
+		}
+		return d, nil
 	}
 	return store.GetDomainByLearner(learnerID)
 }

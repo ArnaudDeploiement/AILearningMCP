@@ -64,6 +64,10 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 				r, _ := errorResult(fmt.Sprintf("domain not found: %v", err))
 				return r, nil, nil
 			}
+			if d.LearnerID != learnerID {
+				r, _ := errorResult("domain not found")
+				return r, nil, nil
+			}
 			domains = []*models.Domain{d}
 		} else {
 			allDomains, err := deps.Store.GetDomainsByLearner(learnerID)

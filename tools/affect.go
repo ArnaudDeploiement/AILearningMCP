@@ -3,7 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"learning-runtime/engine"
 	"learning-runtime/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -80,6 +82,22 @@ func registerRecordAffect(server *mcp.Server, deps *Deps) {
 				calibDelta := perceivedAbility - actualRate
 				result["calibration_bias_delta"] = calibDelta
 			}
+
+			// Compute and persist autonomy score
+			since := time.Now().UTC().Add(-30 * 24 * time.Hour)
+			allInteractions, _ := deps.Store.GetInteractionsSince(learnerID, since)
+			allStates, _ := deps.Store.GetConceptStatesByLearner(learnerID)
+			calibBias, _ := deps.Store.GetCalibrationBias(learnerID, 20)
+
+			autonomy := engine.ComputeAutonomyMetrics(engine.AutonomyInput{
+				Interactions:    allInteractions,
+				ConceptStates:   allStates,
+				CalibrationBias: calibBias,
+				SessionGap:      2 * time.Hour,
+			})
+
+			_ = deps.Store.UpdateAffectAutonomyScore(learnerID, params.SessionID, autonomy.Score)
+			result["autonomy_score"] = autonomy.Score
 		}
 
 		r, _ := jsonResult(result)

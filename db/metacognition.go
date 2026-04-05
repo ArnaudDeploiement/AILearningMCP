@@ -214,6 +214,17 @@ func (s *Store) GetHintStatsForMastered(learnerID string, threshold float64) (hi
 	return hints, total, nil
 }
 
+func (s *Store) UpdateAffectAutonomyScore(learnerID, sessionID string, score float64) error {
+	_, err := s.db.Exec(
+		`UPDATE affect_states SET autonomy_score = ? WHERE learner_id = ? AND session_id = ?`,
+		score, learnerID, sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("update affect autonomy score: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) CountProactiveReviews(learnerID string, since time.Time) (proactive int, total int, err error) {
 	err = s.db.QueryRow(
 		`SELECT COALESCE(SUM(is_proactive_review), 0), COUNT(*)
