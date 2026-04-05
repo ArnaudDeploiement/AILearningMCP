@@ -196,7 +196,7 @@ func (s *Store) DeleteRefreshToken(token string) error {
 
 // ─── Domains ──────────────────────────────────────────────────────────────────
 
-func (s *Store) CreateDomain(learnerID, name string, graph models.KnowledgeSpace) (*models.Domain, error) {
+func (s *Store) CreateDomain(learnerID, name, personalGoal string, graph models.KnowledgeSpace) (*models.Domain, error) {
 	id := generateID()
 	now := time.Now().UTC()
 
@@ -206,18 +206,19 @@ func (s *Store) CreateDomain(learnerID, name string, graph models.KnowledgeSpace
 	}
 
 	_, err = s.db.Exec(
-		`INSERT INTO domains (id, learner_id, name, graph_json, created_at) VALUES (?, ?, ?, ?, ?)`,
-		id, learnerID, name, string(graphJSON), now,
+		`INSERT INTO domains (id, learner_id, name, personal_goal, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		id, learnerID, name, personalGoal, string(graphJSON), now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create domain: %w", err)
 	}
 	return &models.Domain{
-		ID:        id,
-		LearnerID: learnerID,
-		Name:      name,
-		Graph:     graph,
-		CreatedAt: now,
+		ID:           id,
+		LearnerID:    learnerID,
+		Name:         name,
+		PersonalGoal: personalGoal,
+		Graph:        graph,
+		CreatedAt:    now,
 	}, nil
 }
 
@@ -225,10 +226,10 @@ func (s *Store) GetDomainByLearner(learnerID string) (*models.Domain, error) {
 	d := &models.Domain{}
 	var graphJSON string
 	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, graph_json, created_at
+		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
 		 FROM domains WHERE learner_id = ? ORDER BY created_at DESC LIMIT 1`,
 		learnerID,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &graphJSON, &d.CreatedAt)
+	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get domain by learner: %w", err)
 	}
@@ -242,9 +243,9 @@ func (s *Store) GetDomainByID(id string) (*models.Domain, error) {
 	d := &models.Domain{}
 	var graphJSON string
 	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, graph_json, created_at
+		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
 		 FROM domains WHERE id = ?`, id,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &graphJSON, &d.CreatedAt)
+	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get domain by id: %w", err)
 	}
@@ -256,7 +257,7 @@ func (s *Store) GetDomainByID(id string) (*models.Domain, error) {
 
 func (s *Store) GetDomainsByLearner(learnerID string) ([]*models.Domain, error) {
 	rows, err := s.db.Query(
-		`SELECT id, learner_id, name, graph_json, created_at
+		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
 		 FROM domains WHERE learner_id = ? ORDER BY created_at DESC`,
 		learnerID,
 	)
@@ -269,7 +270,7 @@ func (s *Store) GetDomainsByLearner(learnerID string) ([]*models.Domain, error) 
 	for rows.Next() {
 		d := &models.Domain{}
 		var graphJSON string
-		if err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &graphJSON, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan domain row: %w", err)
 		}
 		if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {

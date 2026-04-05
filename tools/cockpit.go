@@ -200,6 +200,31 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			globalProgress = float64(totalMastered) / float64(totalConcepts) * 100
 		}
 
+		// Autonomy metrics
+		since := time.Now().UTC().Add(-30 * 24 * time.Hour)
+		allInteractions, _ := deps.Store.GetInteractionsSince(learnerID, since)
+		calibBias, _ := deps.Store.GetCalibrationBias(learnerID, 20)
+
+		autonomy := engine.ComputeAutonomyMetrics(engine.AutonomyInput{
+			Interactions:    allInteractions,
+			ConceptStates:   states,
+			CalibrationBias: calibBias,
+			SessionGap:      2 * time.Hour,
+		})
+
+		affects, _ := deps.Store.GetRecentAffectStates(learnerID, 10)
+		var autonomyScores []float64
+		var affectLastN []interface{}
+		for _, a := range affects {
+			autonomyScores = append(autonomyScores, a.AutonomyScore)
+			affectLastN = append(affectLastN, a)
+		}
+		if affectLastN == nil {
+			affectLastN = []interface{}{}
+		}
+		autonomy.Trend = engine.ComputeAutonomyTrendExported(autonomyScores)
+		dependencyTrend := autonomy.Trend
+
 		r, _ := jsonResult(map[string]interface{}{
 			"domains":          domainCockpits,
 			"total_concepts":   totalConcepts,
@@ -207,6 +232,10 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			"global_progress":  globalProgress,
 			"alerts":           alerts,
 			"signal":           signal,
+			"autonomy_score":   autonomy.Score,
+			"calibration_bias": calibBias,
+			"affect_last_n":    affectLastN,
+			"dependency_trend": dependencyTrend,
 		})
 		return r, nil, nil
 	})
