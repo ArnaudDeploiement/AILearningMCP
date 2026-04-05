@@ -104,6 +104,30 @@ func (s *Scheduler) checkCriticalAlerts() {
 			s.store.CreateScheduledAlert(learner.ID, string(alert.Type), alert.Concept, time.Now())
 			s.logger.Info("scheduler: critical alert sent", "learner", learner.ID, "type", alert.Type)
 		}
+
+		// Metacognitive alerts
+		affects, _ := s.store.GetRecentAffectStates(learner.ID, 5)
+		calibBias, _ := s.store.GetCalibrationBias(learner.ID, 20)
+
+		var autonomyScores []float64
+		for _, a := range affects {
+			autonomyScores = append(autonomyScores, a.AutonomyScore)
+		}
+
+		metaAlerts := ComputeMetacognitiveAlerts(autonomyScores, calibBias, affects, interactions)
+		for _, alert := range metaAlerts {
+			sent, _ := s.store.WasAlertSentToday(learner.ID, string(alert.Type))
+			if sent {
+				continue
+			}
+			msg := formatMetacognitiveAlert(alert)
+			if err := s.sendDiscordEmbed(learner.WebhookURL, msg); err != nil {
+				s.logger.Error("scheduler: metacognitive webhook", "err", err, "learner", learner.ID)
+				continue
+			}
+			s.store.CreateScheduledAlert(learner.ID, string(alert.Type), alert.Concept, time.Now())
+			s.logger.Info("scheduler: metacognitive alert sent", "learner", learner.ID, "type", alert.Type)
+		}
 	}
 }
 
@@ -276,6 +300,32 @@ type discordEmbed struct {
 
 type discordPayload struct {
 	Embeds []discordEmbed `json:"embeds"`
+}
+
+func formatMetacognitiveAlert(alert models.Alert) discordPayload {
+	title := ""
+	color := 0xFFA500 // orange
+
+	switch alert.Type {
+	case models.AlertDependencyIncreasing:
+		title = "📉 Autonomie en baisse"
+	case models.AlertCalibrationDiverging:
+		title = "🎯 Calibration divergente"
+	case models.AlertAffectNegative:
+		title = "😔 Sessions difficiles"
+	case models.AlertTransferBlocked:
+		title = fmt.Sprintf("🔒 Transfert bloque: %s", alert.Concept)
+	default:
+		title = string(alert.Type)
+	}
+
+	return discordPayload{
+		Embeds: []discordEmbed{{
+			Title:       title,
+			Description: alert.RecommendedAction,
+			Color:       color,
+		}},
+	}
 }
 
 func formatCriticalAlert(alert models.Alert) discordPayload {
