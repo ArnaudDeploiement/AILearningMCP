@@ -69,12 +69,29 @@ func ComputeAlerts(states []*models.ConceptState, recentInteractions []*models.I
 	for concept, streak := range conceptFailStreaks {
 		if streak >= 3 {
 			errorRate := float64(streak) / float64(streak+1)
+
+			// Analyze error types for richer recommendation
+			recommendedAction := "reduire la difficulte"
+			errorTypeCounts := make(map[string]int)
+			for _, i := range recentInteractions {
+				if i.Concept == concept && !i.Success && i.ErrorType != "" {
+					errorTypeCounts[i.ErrorType]++
+				}
+			}
+			if errorTypeCounts["KNOWLEDGE_GAP"] >= 3 {
+				recommendedAction = "reduire la difficulte · lacune conceptuelle — revisiter les fondamentaux"
+			} else if errorTypeCounts["LOGIC_ERROR"] >= 3 {
+				recommendedAction = "reduire la difficulte · erreurs de logique recurrentes — exercices de raisonnement"
+			} else if errorTypeCounts["SYNTAX_ERROR"] >= 3 {
+				recommendedAction = "reduire la difficulte · erreurs de syntaxe recurrentes — exercices de pratique"
+			}
+
 			alerts = append(alerts, models.Alert{
 				Type:              models.AlertZPDDrift,
 				Concept:           concept,
 				Urgency:           models.UrgencyWarning,
 				ErrorRate:         errorRate,
-				RecommendedAction: "reduire la difficulte",
+				RecommendedAction: recommendedAction,
 			})
 		}
 	}
