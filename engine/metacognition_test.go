@@ -140,6 +140,34 @@ func TestDetectMirrorPattern(t *testing.T) {
 			wantNil: false,
 			wantPat: "dependency_increasing",
 		},
+		{
+			name: "no_initiative detected",
+			input: MirrorInput{
+				Interactions:    makeInteractions(10, false, false, 0, true, time.Now().UTC()),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.5}},
+				AutonomyScores:  []float64{0.5, 0.5, 0.5},
+				CalibrationBias: 0.0,
+				SessionCount:    5,
+			},
+			wantNil: false,
+			wantPat: "no_initiative",
+		},
+		{
+			name: "calibration_drift detected",
+			input: MirrorInput{
+				Interactions: func() []*models.Interaction {
+					is := makeInteractions(10, true, false, 0, true, time.Now().UTC())
+					is[0].SelfInitiated = true
+					return is
+				}(),
+				ConceptStates:   []*models.ConceptState{{Concept: "A", PMastery: 0.5}},
+				AutonomyScores:  []float64{0.5, 0.5, 0.5},
+				CalibrationBias: 1.2,
+				SessionCount:    5,
+			},
+			wantNil: false,
+			wantPat: "calibration_drift",
+		},
 	}
 
 	for _, tt := range tests {
