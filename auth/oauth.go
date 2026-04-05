@@ -77,7 +77,7 @@ func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 		CodeChallengeMethod: q.Get("code_challenge_method"),
 		Scope:               q.Get("scope"),
 	}
-	renderAuthPage(w, data, "")
+	renderAuthPage(w, data, "", "login")
 }
 
 func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request) {
@@ -86,12 +86,10 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	mode := r.FormValue("mode") // "login" or "register"
 	email := r.FormValue("email")
 	password := r.FormValue("password")
-	objective := r.FormValue("objective")
-	webhookURL := r.FormValue("webhook_url")
 
-	// OAuth hidden fields
 	redirectURI := r.FormValue("redirect_uri")
 	state := r.FormValue("state")
 	codeChallenge := r.FormValue("code_challenge")
@@ -107,57 +105,71 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 	}
 
 	if email == "" || password == "" {
-		renderAuthPage(w, data, "Email and password are required.")
+		renderAuthPage(w, data, "Email and password are required.", mode)
 		return
 	}
 
 	var learnerID string
 
-	// Check if learner exists.
-	existing, err := s.store.GetLearnerByEmail(email)
-	if err != nil {
-		// Learner does not exist — register.
-		if objective == "" {
-			renderAuthPage(w, data, "Objective is required for new accounts.")
+	if mode == "register" {
+		// Registration flow
+		passwordConfirm := r.FormValue("password_confirm")
+		if password != passwordConfirm {
+			renderAuthPage(w, data, "Passwords do not match.", "register")
 			return
 		}
+		if len(password) < 6 {
+			renderAuthPage(w, data, "Password must be at least 6 characters.", "register")
+			return
+		}
+
+		// Check if email already taken
+		if existing, _ := s.store.GetLearnerByEmail(email); existing != nil {
+			renderAuthPage(w, data, "An account with this email already exists.", "register")
+			return
+		}
+
 		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			s.logger.Error("bcrypt hash failed", "err", err)
-			renderAuthPage(w, data, "Internal error. Please try again.")
+			renderAuthPage(w, data, "Internal error. Please try again.", "register")
 			return
 		}
-		learner, err := s.store.CreateLearner(email, string(hash), objective, webhookURL)
+		learner, err := s.store.CreateLearner(email, string(hash), "", "")
 		if err != nil {
 			s.logger.Error("create learner failed", "err", err)
-			renderAuthPage(w, data, "Could not create account. Please try again.")
+			renderAuthPage(w, data, "Could not create account. Please try again.", "register")
 			return
 		}
 		learnerID = learner.ID
 	} else {
-		// Learner exists — login.
+		// Login flow
+		existing, err := s.store.GetLearnerByEmail(email)
+		if err != nil {
+			renderAuthPage(w, data, "Invalid email or password.", "login")
+			return
+		}
 		if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(password)); err != nil {
-			renderAuthPage(w, data, "Invalid email or password.")
+			renderAuthPage(w, data, "Invalid email or password.", "login")
 			return
 		}
 		learnerID = existing.ID
 	}
 
-	// Generate auth code.
+	// Generate auth code
 	code, err := generateCode()
 	if err != nil {
 		s.logger.Error("generate code failed", "err", err)
-		renderAuthPage(w, data, "Internal error. Please try again.")
+		renderAuthPage(w, data, "Internal error. Please try again.", mode)
 		return
 	}
 
 	if err := s.store.CreateAuthCode(code, learnerID, codeChallenge, time.Now().Add(5*time.Minute)); err != nil {
 		s.logger.Error("create auth code failed", "err", err)
-		renderAuthPage(w, data, "Internal error. Please try again.")
+		renderAuthPage(w, data, "Internal error. Please try again.", mode)
 		return
 	}
 
-	// Redirect to redirect_uri with code and state.
 	redirectURL := redirectURI + "?code=" + code
 	if state != "" {
 		redirectURL += "&state=" + state
