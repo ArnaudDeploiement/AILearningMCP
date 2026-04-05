@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,9 +49,13 @@ func (s *Scheduler) Start() error {
 	if _, err := s.cron.AddFunc("0 21 * * *", s.sendDailyRecap); err != nil {
 		return fmt.Errorf("add daily recap job: %w", err)
 	}
+	// Cleanup expired auth codes and refresh tokens: hourly
+	if _, err := s.cron.AddFunc("0 * * * *", s.cleanupExpiredData); err != nil {
+		return fmt.Errorf("add cleanup job: %w", err)
+	}
 
 	s.cron.Start()
-	s.logger.Info("scheduler started", "jobs", "critical(30m), reviews(9/13/19h), motivation(8h), recap(21h)")
+	s.logger.Info("scheduler started", "jobs", "critical(30m), reviews(9/13/19h), motivation(8h), recap(21h), cleanup(1h)")
 	return nil
 }
 
@@ -243,6 +248,24 @@ func (s *Scheduler) sendDailyRecap() {
 	}
 }
 
+// ─── Cleanup (hourly) ─────────────────────────────────────────────────────
+
+func (s *Scheduler) cleanupExpiredData() {
+	codes, err := s.store.CleanupExpiredCodes()
+	if err != nil {
+		s.logger.Error("scheduler: cleanup codes", "err", err)
+	} else if codes > 0 {
+		s.logger.Info("scheduler: cleaned expired codes", "count", codes)
+	}
+
+	tokens, err := s.store.CleanupExpiredRefreshTokens()
+	if err != nil {
+		s.logger.Error("scheduler: cleanup tokens", "err", err)
+	} else if tokens > 0 {
+		s.logger.Info("scheduler: cleaned expired refresh tokens", "count", tokens)
+	}
+}
+
 // ─── Message Formatting ─────────────────────────────────────────────────────
 
 type discordEmbed struct {
@@ -391,28 +414,51 @@ func formatInactivityNudge(hoursSinceActive float64) discordPayload {
 
 func (s *Scheduler) sendDiscordEmbed(url string, payload discordPayload) error {
 	body, _ := json.Marshal(payload)
-	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("webhook returned %d", resp.StatusCode)
-	}
-	return nil
+	return s.doWithRetry(url, body)
 }
 
 // sendWebhook sends a plain text message (kept for backwards compatibility).
 func (s *Scheduler) sendWebhook(url, message string) error {
-	payload := map[string]string{"content": message}
-	body, _ := json.Marshal(payload)
-	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return err
+	body, _ := json.Marshal(map[string]string{"content": message})
+	return s.doWithRetry(url, body)
+}
+
+// doWithRetry posts body to url with exponential backoff.
+// 4 attempts: immediate, +1s, +5s, +25s.
+// Stops on 4xx (except 429). Respects Discord Retry-After header on 429.
+func (s *Scheduler) doWithRetry(url string, body []byte) error {
+	delays := []time.Duration{0, 1 * time.Second, 5 * time.Second, 25 * time.Second}
+	var lastErr error
+	for attempt, delay := range delays {
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))
+		if err != nil {
+			lastErr = err
+			s.logger.Warn("webhook network error", "attempt", attempt+1, "err", err)
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode < 400 {
+			return nil
+		}
+		lastErr = fmt.Errorf("webhook returned %d", resp.StatusCode)
+		// 429: respect Retry-After
+		if resp.StatusCode == 429 {
+			if ra := resp.Header.Get("Retry-After"); ra != "" {
+				if secs, err := strconv.Atoi(ra); err == nil && secs > 0 && secs <= 60 {
+					s.logger.Warn("webhook rate limited, waiting", "retry_after", secs)
+					time.Sleep(time.Duration(secs) * time.Second)
+				}
+			}
+			continue
+		}
+		// 4xx (not 429): client error, don't retry
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			return lastErr
+		}
+		s.logger.Warn("webhook retry", "attempt", attempt+1, "status", resp.StatusCode)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("webhook returned %d", resp.StatusCode)
-	}
-	return nil
+	return lastErr
 }
