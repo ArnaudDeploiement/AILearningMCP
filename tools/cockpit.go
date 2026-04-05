@@ -42,6 +42,7 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetCockpitStateParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("get_cockpit_state: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -61,6 +62,7 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 		if params.DomainID != "" {
 			d, err := deps.Store.GetDomainByID(params.DomainID)
 			if err != nil {
+				deps.Logger.Error("get_cockpit_state: failed to get domain", "err", err, "learner", learnerID)
 				r, _ := errorResult(fmt.Sprintf("domain not found: %v", err))
 				return r, nil, nil
 			}
@@ -71,7 +73,12 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			domains = []*models.Domain{d}
 		} else {
 			allDomains, err := deps.Store.GetDomainsByLearner(learnerID)
-			if err != nil || len(allDomains) == 0 {
+			if err != nil {
+				deps.Logger.Error("get_cockpit_state: failed to get domains", "err", err, "learner", learnerID)
+				r, _ := errorResult("aucun domaine configure")
+				return r, nil, nil
+			}
+			if len(allDomains) == 0 {
 				r, _ := errorResult("aucun domaine configure")
 				return r, nil, nil
 			}

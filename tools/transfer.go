@@ -23,6 +23,7 @@ func registerTransferChallenge(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params TransferChallengeParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("transfer_challenge: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -34,6 +35,7 @@ func registerTransferChallenge(server *mcp.Server, deps *Deps) {
 
 		cs, err := deps.Store.GetConceptState(learnerID, params.ConceptID)
 		if err != nil {
+			deps.Logger.Error("transfer_challenge: failed to get concept state", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("concept not found: %v", err))
 			return r, nil, nil
 		}
@@ -96,6 +98,7 @@ func registerRecordTransferResult(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordTransferResultParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("record_transfer_result: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -109,6 +112,7 @@ func registerRecordTransferResult(server *mcp.Server, deps *Deps) {
 		}
 
 		if err := deps.Store.CreateTransferRecord(record); err != nil {
+			deps.Logger.Error("record_transfer_result: failed to create transfer record", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to record transfer: %v", err))
 			return r, nil, nil
 		}

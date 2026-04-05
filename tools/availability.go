@@ -19,12 +19,14 @@ func registerGetAvailabilityModel(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetAvailabilityModelParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("get_availability_model: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
 
 		avail, err := deps.Store.GetAvailability(learnerID)
 		if err != nil {
+			deps.Logger.Error("get_availability_model: failed to get availability", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to get availability: %v", err))
 			return r, nil, nil
 		}

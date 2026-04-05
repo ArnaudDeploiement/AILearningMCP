@@ -32,6 +32,7 @@ func registerRecordInteraction(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordInteractionParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("record_interaction: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -68,6 +69,7 @@ func registerRecordInteraction(server *mcp.Server, deps *Deps) {
 		}
 
 		if err := deps.Store.CreateInteraction(interaction); err != nil {
+			deps.Logger.Error("record_interaction: failed to create interaction", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to create interaction: %v", err))
 			return r, nil, nil
 		}
@@ -138,6 +140,7 @@ func registerRecordInteraction(server *mcp.Server, deps *Deps) {
 
 		// Persist updated concept state
 		if err := deps.Store.UpsertConceptState(cs); err != nil {
+			deps.Logger.Error("record_interaction: failed to upsert concept state", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to update concept state: %v", err))
 			return r, nil, nil
 		}

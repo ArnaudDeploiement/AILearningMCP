@@ -23,6 +23,7 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params InitDomainParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("init_domain: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -46,6 +47,7 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 
 		domain, err := deps.Store.CreateDomain(learnerID, params.Name, params.PersonalGoal, graph)
 		if err != nil {
+			deps.Logger.Error("init_domain: failed to create domain", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to create domain: %v", err))
 			return r, nil, nil
 		}
@@ -54,6 +56,7 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 		for _, concept := range params.Concepts {
 			cs := models.NewConceptState(learnerID, concept)
 			if err := deps.Store.InsertConceptStateIfNotExists(cs); err != nil {
+				deps.Logger.Error("init_domain: failed to initialize concept state", "err", err, "learner", learnerID, "concept", concept)
 				r, _ := errorResult(fmt.Sprintf("failed to initialize concept %s: %v", concept, err))
 				return r, nil, nil
 			}
@@ -83,6 +86,7 @@ func registerAddConcepts(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params AddConceptsParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("add_concepts: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -95,6 +99,7 @@ func registerAddConcepts(server *mcp.Server, deps *Deps) {
 		// Resolve domain
 		domain, err := resolveDomain(deps.Store, learnerID, params.DomainID)
 		if err != nil {
+			deps.Logger.Error("add_concepts: failed to resolve domain", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("domain not found: %v", err))
 			return r, nil, nil
 		}
@@ -132,6 +137,7 @@ func registerAddConcepts(server *mcp.Server, deps *Deps) {
 
 		// Persist updated graph
 		if err := deps.Store.UpdateDomainGraph(domain.ID, domain.Graph); err != nil {
+			deps.Logger.Error("add_concepts: failed to update domain graph", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to update domain graph: %v", err))
 			return r, nil, nil
 		}
@@ -140,6 +146,7 @@ func registerAddConcepts(server *mcp.Server, deps *Deps) {
 		for _, concept := range params.Concepts {
 			cs := models.NewConceptState(learnerID, concept)
 			if err := deps.Store.InsertConceptStateIfNotExists(cs); err != nil {
+				deps.Logger.Error("add_concepts: failed to initialize concept state", "err", err, "learner", learnerID, "concept", concept)
 				r, _ := errorResult(fmt.Sprintf("failed to initialize concept %s: %v", concept, err))
 				return r, nil, nil
 			}
