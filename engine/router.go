@@ -39,11 +39,28 @@ func Route(alerts []models.Alert, frontier []string, states []*models.ConceptSta
 			if sessionConcepts[a.Concept] >= 2 {
 				continue
 			}
+			// Rotate format based on interaction count for this concept
+			plateauFormats := []struct {
+				format string
+				prompt string
+			}{
+				{"debugging", "Genere un cas de debugging reel sur %s. Presente du code casse a corriger."},
+				{"real_world_case", "Genere un cas d'application reel sur %s. Presente un scenario professionnel concret."},
+				{"teaching_exercise", "Demande a l'apprenant d'expliquer %s a un debutant. Verifie la clarte de l'explication."},
+				{"creative_application", "Genere un projet creatif sur %s. L'apprenant doit appliquer le concept dans un contexte inattendu."},
+			}
+			conceptCount := 0
+			for _, i := range recentInteractions {
+				if i.Concept == a.Concept {
+					conceptCount++
+				}
+			}
+			pick := plateauFormats[conceptCount%len(plateauFormats)]
 			return models.Activity{
 				Type: models.ActivityDebuggingCase, Concept: a.Concept, DifficultyTarget: 0.60,
-				Format: "debugging", EstimatedMinutes: 15,
-				Rationale:    fmt.Sprintf("plateau detecte depuis %d sessions", a.SessionsStalled),
-				PromptForLLM: fmt.Sprintf("Genere un cas de debugging reel sur %s. Presente du code casse a corriger.", a.Concept),
+				Format: pick.format, EstimatedMinutes: 15,
+				Rationale:    fmt.Sprintf("plateau detecte depuis %d sessions · format: %s", a.SessionsStalled, pick.format),
+				PromptForLLM: fmt.Sprintf(pick.prompt, a.Concept),
 			}
 		}
 	}
