@@ -20,6 +20,7 @@ func registerGetAutonomyMetrics(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetAutonomyMetricsParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("get_autonomy_metrics: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}

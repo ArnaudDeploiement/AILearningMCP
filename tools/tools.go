@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"learning-runtime/auth"
 	"learning-runtime/db"
@@ -14,7 +15,8 @@ import (
 
 // Deps holds shared dependencies for all MCP tool handlers.
 type Deps struct {
-	Store *db.Store
+	Store  *db.Store
+	Logger *slog.Logger
 }
 
 func getLearnerID(ctx context.Context) (string, error) {

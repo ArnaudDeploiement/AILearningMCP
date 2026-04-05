@@ -57,7 +57,7 @@ func main() {
 	}, nil)
 
 	// Register tools
-	deps := &tools.Deps{Store: store}
+	deps := &tools.Deps{Store: store, Logger: logger}
 	tools.RegisterTools(mcpServer, deps)
 
 	// Create MCP handler — disable localhost protection (behind Tailscale Funnel)

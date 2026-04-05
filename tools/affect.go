@@ -27,6 +27,7 @@ func registerRecordAffect(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordAffectParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("record_affect: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -47,6 +48,7 @@ func registerRecordAffect(server *mcp.Server, deps *Deps) {
 		}
 
 		if err := deps.Store.UpsertAffectState(affect); err != nil {
+			deps.Logger.Error("record_affect: failed to upsert affect state", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to record affect: %v", err))
 			return r, nil, nil
 		}

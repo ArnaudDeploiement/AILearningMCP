@@ -33,12 +33,14 @@ func registerLearningNegotiation(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params LearningNegotiationParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("learning_negotiation: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
 
 		domain, err := resolveDomain(deps.Store, learnerID, params.DomainID)
 		if err != nil || domain == nil {
+			deps.Logger.Error("learning_negotiation: failed to resolve domain", "err", err, "learner", learnerID)
 			r, _ := errorResult("domain not found")
 			return r, nil, nil
 		}

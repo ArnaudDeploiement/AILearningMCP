@@ -21,6 +21,7 @@ func registerFeynmanChallenge(server *mcp.Server, deps *Deps) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params FeynmanChallengeParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
+			deps.Logger.Error("feynman_challenge: auth failed", "err", err)
 			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
@@ -32,6 +33,7 @@ func registerFeynmanChallenge(server *mcp.Server, deps *Deps) {
 
 		cs, err := deps.Store.GetConceptState(learnerID, params.ConceptID)
 		if err != nil {
+			deps.Logger.Error("feynman_challenge: failed to get concept state", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("concept not found: %v", err))
 			return r, nil, nil
 		}
