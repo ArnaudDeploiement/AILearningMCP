@@ -95,6 +95,42 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
     created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Metacognitive loop tables (v0.9)
+
+CREATE TABLE IF NOT EXISTS affect_states (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id           TEXT NOT NULL REFERENCES learners(id),
+    session_id           TEXT NOT NULL,
+    energy               INTEGER DEFAULT 0,
+    subject_confidence   INTEGER DEFAULT 0,
+    satisfaction         INTEGER DEFAULT 0,
+    perceived_difficulty INTEGER DEFAULT 0,
+    next_session_intent  INTEGER DEFAULT 0,
+    autonomy_score       REAL DEFAULT 0,
+    created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(learner_id, session_id)
+);
+
+CREATE TABLE IF NOT EXISTS calibration_records (
+    prediction_id TEXT PRIMARY KEY,
+    learner_id    TEXT NOT NULL REFERENCES learners(id),
+    concept_id    TEXT NOT NULL,
+    predicted     REAL NOT NULL,
+    actual        REAL,
+    delta         REAL,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS transfer_records (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id   TEXT NOT NULL REFERENCES learners(id),
+    concept_id   TEXT NOT NULL,
+    context_type TEXT NOT NULL,
+    score        REAL NOT NULL,
+    session_id   TEXT DEFAULT '',
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_concept_states_learner
     ON concept_states(learner_id);
 
@@ -112,3 +148,15 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_alerts_learner_type
 
 CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires
     ON oauth_codes(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_affect_states_learner
+    ON affect_states(learner_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_calibration_records_learner
+    ON calibration_records(learner_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_records_learner_concept
+    ON transfer_records(learner_id, concept_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_interactions_self_initiated
+    ON interactions(learner_id, self_initiated, created_at);
