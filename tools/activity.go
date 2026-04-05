@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"time"
 
 	"learning-runtime/algorithms"
 	"learning-runtime/engine"
@@ -93,11 +94,40 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 		// Route to next activity (session-aware)
 		activity := engine.Route(alerts, frontier, domainStates, domainInteractions, sessionConcepts)
 
+		// Metacognitive mirror
+		since := time.Now().UTC().Add(-7 * 24 * time.Hour)
+		allInteractions, _ := deps.Store.GetInteractionsSince(learnerID, since)
+		calibBias, _ := deps.Store.GetCalibrationBias(learnerID, 20)
+		affects, _ := deps.Store.GetRecentAffectStates(learnerID, 10)
+
+		var autonomyScores []float64
+		for _, a := range affects {
+			autonomyScores = append(autonomyScores, a.AutonomyScore)
+		}
+		mirrorSessionCount := len(engine.GroupIntoSessionsExported(allInteractions, 2*time.Hour))
+
+		mirror := engine.DetectMirrorPattern(engine.MirrorInput{
+			Interactions:    allInteractions,
+			ConceptStates:   domainStates,
+			AutonomyScores:  autonomyScores,
+			CalibrationBias: calibBias,
+			SessionCount:    mirrorSessionCount,
+		})
+
+		// Tutor mode
+		var currentAffect *models.AffectState
+		if len(affects) > 0 {
+			currentAffect = affects[0]
+		}
+		tutorMode := engine.ComputeTutorMode(currentAffect, alerts)
+
 		r, _ := jsonResult(map[string]interface{}{
 			"needs_domain_setup":    false,
 			"domain_id":             domain.ID,
 			"activity":              activity,
 			"session_concepts_done": len(sessionConcepts),
+			"metacognitive_mirror":  mirror,
+			"tutor_mode":            tutorMode,
 		})
 		return r, nil, nil
 	})

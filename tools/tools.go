@@ -62,5 +62,7 @@ func RegisterTools(server *mcp.Server, deps *Deps) {
 	registerRecordAffect(server, deps)
 	registerCalibrationCheck(server, deps)
 	registerRecordCalibrationResult(server, deps)
+	registerGetAutonomyMetrics(server, deps)
+	registerGetMetacognitiveMirror(server, deps)
 	RegisterPrompt(server)
 }

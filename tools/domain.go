@@ -13,6 +13,7 @@ type InitDomainParams struct {
 	Name          string              `json:"name" jsonschema:"Nom du domaine d'apprentissage"`
 	Concepts      []string            `json:"concepts" jsonschema:"Liste des concepts du domaine"`
 	Prerequisites map[string][]string `json:"prerequisites" jsonschema:"Graphe de prerequis (concept -> liste de prerequis)"`
+	PersonalGoal  string              `json:"personal_goal,omitempty" jsonschema:"Objectif personnel de l'apprenant dans ce domaine (optionnel)"`
 }
 
 func registerInitDomain(server *mcp.Server, deps *Deps) {
@@ -43,7 +44,7 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 			graph.Prerequisites = make(map[string][]string)
 		}
 
-		domain, err := deps.Store.CreateDomain(learnerID, params.Name, graph)
+		domain, err := deps.Store.CreateDomain(learnerID, params.Name, params.PersonalGoal, graph)
 		if err != nil {
 			r, _ := errorResult(fmt.Sprintf("failed to create domain: %v", err))
 			return r, nil, nil
