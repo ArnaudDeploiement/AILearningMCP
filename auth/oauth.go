@@ -32,15 +32,15 @@ func NewOAuthServer(store *db.Store, baseURL string, logger *slog.Logger) *OAuth
 
 // RegisterRoutes registers all OAuth endpoints on the given mux.
 func (s *OAuthServer) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleAuthServerMetadata)
-	mux.HandleFunc("GET /.well-known/oauth-protected-resource", s.handleProtectedResourceMetadata)
-	mux.HandleFunc("GET /authorize", s.handleAuthorizeGet)
-	mux.HandleFunc("POST /authorize", s.handleAuthorizePost)
-	mux.HandleFunc("POST /token", s.handleToken)
-	mux.HandleFunc("POST /register", s.handleDynamicClientRegistration)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.HandleAuthServerMetadata)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", s.HandleProtectedResourceMetadata)
+	mux.HandleFunc("GET /authorize", s.HandleAuthorizeGet)
+	mux.HandleFunc("POST /authorize", s.HandleAuthorizePost)
+	mux.HandleFunc("POST /token", s.HandleToken)
+	mux.HandleFunc("POST /register", s.HandleRegister)
 }
 
-func (s *OAuthServer) handleAuthServerMetadata(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleAuthServerMetadata(w http.ResponseWriter, r *http.Request) {
 	meta := map[string]interface{}{
 		"issuer":                                s.baseURL,
 		"authorization_endpoint":                s.baseURL + "/authorize",
@@ -56,7 +56,7 @@ func (s *OAuthServer) handleAuthServerMetadata(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(meta)
 }
 
-func (s *OAuthServer) handleProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	meta := map[string]interface{}{
 		"resource":              s.baseURL + "/mcp",
 		"authorization_servers": []string{s.baseURL},
@@ -66,7 +66,7 @@ func (s *OAuthServer) handleProtectedResourceMetadata(w http.ResponseWriter, r *
 	json.NewEncoder(w).Encode(meta)
 }
 
-func (s *OAuthServer) handleAuthorizeGet(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	data := authPageData{
 		ClientID:            q.Get("client_id"),
@@ -80,7 +80,7 @@ func (s *OAuthServer) handleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 	renderAuthPage(w, data, "")
 }
 
-func (s *OAuthServer) handleAuthorizePost(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -165,7 +165,7 @@ func (s *OAuthServer) handleAuthorizePost(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
-func (s *OAuthServer) handleToken(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -284,9 +284,9 @@ func writeTokenError(w http.ResponseWriter, errCode string, status int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": errCode})
 }
 
-// handleDynamicClientRegistration implements RFC 7591.
+// HandleRegister implements RFC 7591 dynamic client registration.
 // Claude.ai must register as an OAuth client before starting the auth flow.
-func (s *OAuthServer) handleDynamicClientRegistration(w http.ResponseWriter, r *http.Request) {
+func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid_client_metadata"}`, http.StatusBadRequest)

@@ -83,11 +83,24 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// OAuth routes
-	oauthServer.RegisterRoutes(mux)
+	// Rate limiters (in-process, per-IP)
+	authLimiter := auth.NewRateLimiter(10.0/60, 10)       // 10/min for auth endpoints
+	registerLimiter := auth.NewRateLimiter(5.0/60, 5)     // 5/min for client registration
+	mcpLimiter := auth.NewRateLimiter(1, 60)              // 60/min for MCP API
+	defer authLimiter.Stop()
+	defer registerLimiter.Stop()
+	defer mcpLimiter.Stop()
 
-	// MCP route (auth protected)
-	mux.Handle("/mcp", auth.BearerMiddleware(baseURL, mcpHandler))
+	// OAuth routes — rate-limit sensitive endpoints
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", oauthServer.HandleAuthServerMetadata)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", oauthServer.HandleProtectedResourceMetadata)
+	mux.HandleFunc("GET /authorize", oauthServer.HandleAuthorizeGet)
+	mux.Handle("POST /authorize", auth.RateLimitMiddleware(authLimiter, http.HandlerFunc(oauthServer.HandleAuthorizePost)))
+	mux.Handle("POST /token", auth.RateLimitMiddleware(authLimiter, http.HandlerFunc(oauthServer.HandleToken)))
+	mux.Handle("POST /register", auth.RateLimitMiddleware(registerLimiter, http.HandlerFunc(oauthServer.HandleRegister)))
+
+	// MCP route (auth + rate limit protected)
+	mux.Handle("/mcp", auth.RateLimitMiddleware(mcpLimiter, auth.BearerMiddleware(baseURL, mcpHandler)))
 
 	// Start scheduler
 	scheduler := engine.NewScheduler(store, logger)
