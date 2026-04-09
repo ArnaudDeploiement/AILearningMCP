@@ -36,6 +36,7 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE interactions ADD COLUMN calibration_id TEXT DEFAULT ''`,
 		`ALTER TABLE interactions ADD COLUMN is_proactive_review INTEGER DEFAULT 0`,
 		`ALTER TABLE domains ADD COLUMN personal_goal TEXT DEFAULT ''`,
+		`ALTER TABLE domains ADD COLUMN archived INTEGER DEFAULT 0`,
 	}
 	for _, m := range alterMigrations {
 		_, _ = db.Exec(m) // ignore "duplicate column" errors

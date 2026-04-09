@@ -225,14 +225,16 @@ func (s *Store) CreateDomain(learnerID, name, personalGoal string, graph models.
 func (s *Store) GetDomainByLearner(learnerID string) (*models.Domain, error) {
 	d := &models.Domain{}
 	var graphJSON string
+	var archived int
 	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
-		 FROM domains WHERE learner_id = ? ORDER BY created_at DESC LIMIT 1`,
+		`SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
+		 FROM domains WHERE learner_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT 1`,
 		learnerID,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt)
+	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get domain by learner: %w", err)
 	}
+	d.Archived = archived != 0
 	if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
 		return nil, fmt.Errorf("unmarshal graph: %w", err)
 	}
@@ -242,25 +244,29 @@ func (s *Store) GetDomainByLearner(learnerID string) (*models.Domain, error) {
 func (s *Store) GetDomainByID(id string) (*models.Domain, error) {
 	d := &models.Domain{}
 	var graphJSON string
+	var archived int
 	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
+		`SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
 		 FROM domains WHERE id = ?`, id,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt)
+	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get domain by id: %w", err)
 	}
+	d.Archived = archived != 0
 	if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
 		return nil, fmt.Errorf("unmarshal graph: %w", err)
 	}
 	return d, nil
 }
 
-func (s *Store) GetDomainsByLearner(learnerID string) ([]*models.Domain, error) {
-	rows, err := s.db.Query(
-		`SELECT id, learner_id, name, personal_goal, graph_json, created_at
-		 FROM domains WHERE learner_id = ? ORDER BY created_at DESC`,
-		learnerID,
-	)
+func (s *Store) GetDomainsByLearner(learnerID string, includeArchived bool) ([]*models.Domain, error) {
+	query := `SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
+		 FROM domains WHERE learner_id = ?`
+	if !includeArchived {
+		query += ` AND archived = 0`
+	}
+	query += ` ORDER BY created_at DESC`
+	rows, err := s.db.Query(query, learnerID)
 	if err != nil {
 		return nil, fmt.Errorf("get domains by learner: %w", err)
 	}
@@ -270,9 +276,11 @@ func (s *Store) GetDomainsByLearner(learnerID string) ([]*models.Domain, error) 
 	for rows.Next() {
 		d := &models.Domain{}
 		var graphJSON string
-		if err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &d.CreatedAt); err != nil {
+		var archived int
+		if err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan domain row: %w", err)
 		}
+		d.Archived = archived != 0
 		if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
 			return nil, fmt.Errorf("unmarshal graph: %w", err)
 		}
@@ -292,6 +300,51 @@ func (s *Store) UpdateDomainGraph(domainID string, graph models.KnowledgeSpace) 
 	)
 	if err != nil {
 		return fmt.Errorf("update domain graph: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ArchiveDomain(domainID, learnerID string) error {
+	result, err := s.db.Exec(
+		`UPDATE domains SET archived = 1 WHERE id = ? AND learner_id = ?`,
+		domainID, learnerID,
+	)
+	if err != nil {
+		return fmt.Errorf("archive domain: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("domain not found")
+	}
+	return nil
+}
+
+func (s *Store) UnarchiveDomain(domainID, learnerID string) error {
+	result, err := s.db.Exec(
+		`UPDATE domains SET archived = 0 WHERE id = ? AND learner_id = ?`,
+		domainID, learnerID,
+	)
+	if err != nil {
+		return fmt.Errorf("unarchive domain: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("domain not found")
+	}
+	return nil
+}
+
+func (s *Store) DeleteDomain(domainID, learnerID string) error {
+	result, err := s.db.Exec(
+		`DELETE FROM domains WHERE id = ? AND learner_id = ?`,
+		domainID, learnerID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete domain: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("domain not found")
 	}
 	return nil
 }

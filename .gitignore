@@ -14,3 +14,6 @@ learning-runtime
 .idea/
 .vscode/
 *.swp
+
+# Superpowers internal docs
+docs/superpowers/

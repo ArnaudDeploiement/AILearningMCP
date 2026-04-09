@@ -13,7 +13,8 @@ import (
 )
 
 type GetCockpitStateParams struct {
-	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel). Si absent, affiche tous les domaines actifs."`
+	DomainID        string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel). Si absent, affiche tous les domaines actifs."`
+	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"Si true, inclut les domaines archives dans la reponse."`
 }
 
 type conceptProgress struct {
@@ -27,6 +28,7 @@ type conceptProgress struct {
 type domainCockpit struct {
 	DomainID       string            `json:"domain_id"`
 	Name           string            `json:"name"`
+	Archived       bool              `json:"archived"`
 	TotalConcepts  int               `json:"total_concepts"`
 	MasteredCount  int               `json:"mastered_count"`
 	ProgressPct    float64           `json:"progress_percent"`
@@ -72,7 +74,7 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			}
 			domains = []*models.Domain{d}
 		} else {
-			allDomains, err := deps.Store.GetDomainsByLearner(learnerID)
+			allDomains, err := deps.Store.GetDomainsByLearner(learnerID, params.IncludeArchived)
 			if err != nil {
 				deps.Logger.Error("get_cockpit_state: failed to get domains", "err", err, "learner", learnerID)
 				r, _ := errorResult("aucun domaine configure")
@@ -166,6 +168,7 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			domainCockpits = append(domainCockpits, domainCockpit{
 				DomainID:        domain.ID,
 				Name:            domain.Name,
+				Archived:        domain.Archived,
 				TotalConcepts:   len(domain.Graph.Concepts),
 				MasteredCount:   masteredCount,
 				ProgressPct:     progressPct,

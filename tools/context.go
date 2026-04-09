@@ -83,8 +83,8 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 			openingMessage += fmt.Sprintf(" · Priorite: %s (retention %.0f%%)", priorityConcept, priorityRetention*100)
 		}
 
-		// List all domains for multi-domain awareness
-		allDomains, _ := deps.Store.GetDomainsByLearner(learnerID)
+		// List active domains for multi-domain awareness
+		allDomains, _ := deps.Store.GetDomainsByLearner(learnerID, false)
 		var domainList []map[string]interface{}
 		for _, d := range allDomains {
 			domainList = append(domainList, map[string]interface{}{
@@ -95,6 +95,21 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 		}
 		if domainList == nil {
 			domainList = []map[string]interface{}{}
+		}
+
+		// List archived domains so Claude knows they exist
+		archivedDomains, _ := deps.Store.GetDomainsByLearner(learnerID, true)
+		var archivedList []map[string]interface{}
+		for _, d := range archivedDomains {
+			if d.Archived {
+				archivedList = append(archivedList, map[string]interface{}{
+					"domain_id": d.ID,
+					"name":      d.Name,
+				})
+			}
+		}
+		if archivedList == nil {
+			archivedList = []map[string]interface{}{}
 		}
 
 		r, _ := jsonResult(map[string]interface{}{
@@ -109,6 +124,7 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 			"priority_concept":   priorityConcept,
 			"priority_retention": priorityRetention,
 			"domains":            domainList,
+			"archived_domains":   archivedList,
 		})
 		return r, nil, nil
 	})

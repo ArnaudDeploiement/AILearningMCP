@@ -68,6 +68,7 @@ type Domain struct {
 	Name         string
 	PersonalGoal string
 	Graph        KnowledgeSpace
+	Archived     bool
 	CreatedAt    time.Time
 }
 
