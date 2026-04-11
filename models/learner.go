@@ -66,8 +66,10 @@ type Interaction struct {
 	HintsRequested    int
 	SelfInitiated     bool
 	CalibrationID     string
-	IsProactiveReview bool
-	CreatedAt         time.Time
+	IsProactiveReview   bool
+	MisconceptionType   string
+	MisconceptionDetail string
+	CreatedAt           time.Time
 }
 
 type RefreshToken struct {
