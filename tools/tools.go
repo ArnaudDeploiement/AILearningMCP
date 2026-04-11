@@ -80,5 +80,6 @@ func RegisterTools(server *mcp.Server, deps *Deps) {
 	registerArchiveDomain(server, deps)
 	registerUnarchiveDomain(server, deps)
 	registerDeleteDomain(server, deps)
+	registerGetMisconceptions(server, deps)
 	RegisterPrompt(server)
 }
