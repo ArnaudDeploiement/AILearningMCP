@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS interactions (
     self_initiated     INTEGER DEFAULT 0,
     calibration_id     TEXT DEFAULT '',
     is_proactive_review INTEGER DEFAULT 0,
+    misconception_type    TEXT,
+    misconception_detail  TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

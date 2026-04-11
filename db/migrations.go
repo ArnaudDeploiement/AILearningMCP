@@ -37,6 +37,8 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE interactions ADD COLUMN is_proactive_review INTEGER DEFAULT 0`,
 		`ALTER TABLE domains ADD COLUMN personal_goal TEXT DEFAULT ''`,
 		`ALTER TABLE domains ADD COLUMN archived INTEGER DEFAULT 0`,
+		`ALTER TABLE interactions ADD COLUMN misconception_type TEXT`,
+		`ALTER TABLE interactions ADD COLUMN misconception_detail TEXT`,
 	}
 	for _, m := range alterMigrations {
 		_, _ = db.Exec(m) // ignore "duplicate column" errors
@@ -98,6 +100,7 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_calibration_records_learner ON calibration_records(learner_id, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_transfer_records_learner_concept ON transfer_records(learner_id, concept_id, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_interactions_self_initiated ON interactions(learner_id, self_initiated, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_interactions_misconception ON interactions(learner_id, concept, misconception_type)`,
 	}
 	for _, m := range idempotentMigrations {
 		if _, err := db.Exec(m); err != nil {
