@@ -6,6 +6,25 @@ import (
 	"time"
 )
 
+// parseTimeFlex attempts several common SQLite/Go time formats.
+func parseTimeFlex(s string) (time.Time, error) {
+	for _, layout := range []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02T15:04:05.999999999-07:00",
+		"2006-01-02T15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("cannot parse time %q", s)
+}
+
 // ─── Misconception Groups ──────────────────────────────────────────────────
 
 type MisconceptionGroup struct {
@@ -37,9 +56,12 @@ func (s *Store) GetMisconceptionGroups(learnerID string, conceptFilter map[strin
 	var groups []MisconceptionGroup
 	for rows.Next() {
 		var g MisconceptionGroup
-		if err := rows.Scan(&g.Concept, &g.MisconceptionType, &g.Count, &g.FirstSeen, &g.LastSeen); err != nil {
+		var firstSeen, lastSeen string
+		if err := rows.Scan(&g.Concept, &g.MisconceptionType, &g.Count, &firstSeen, &lastSeen); err != nil {
 			return nil, fmt.Errorf("scan misconception group: %w", err)
 		}
+		g.FirstSeen, _ = parseTimeFlex(firstSeen)
+		g.LastSeen, _ = parseTimeFlex(lastSeen)
 
 		// Go-side concept filtering
 		if conceptFilter != nil && !conceptFilter[g.Concept] {
