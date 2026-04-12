@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"learning-runtime/models"
@@ -9,11 +10,19 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type ValueFramingsInput struct {
+	Financial    string `json:"financial,omitempty" jsonschema:"Gain financier (1-2 phrases)"`
+	Employment   string `json:"employment,omitempty" jsonschema:"Gain employabilite / carriere (1-2 phrases)"`
+	Intellectual string `json:"intellectual,omitempty" jsonschema:"Gain intellectuel / beau raisonnement (1-2 phrases)"`
+	Innovation   string `json:"innovation,omitempty" jsonschema:"Gain creation / innovation (1-2 phrases)"`
+}
+
 type InitDomainParams struct {
 	Name          string              `json:"name" jsonschema:"Nom du domaine d'apprentissage"`
 	Concepts      []string            `json:"concepts" jsonschema:"Liste des concepts du domaine"`
 	Prerequisites map[string][]string `json:"prerequisites" jsonschema:"Graphe de prerequis (concept -> liste de prerequis)"`
 	PersonalGoal  string              `json:"personal_goal,omitempty" jsonschema:"Objectif personnel de l'apprenant dans ce domaine (optionnel)"`
+	ValueFramings *ValueFramingsInput `json:"value_framings,omitempty" jsonschema:"4 axes de valeur (financier/emploi/intellectuel/innovation). 1-2 phrases authored par axe. Optionnel — peut etre rempli a la volee par la suite."`
 }
 
 func registerInitDomain(server *mcp.Server, deps *Deps) {
@@ -45,7 +54,20 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 			graph.Prerequisites = make(map[string][]string)
 		}
 
-		domain, err := deps.Store.CreateDomain(learnerID, params.Name, params.PersonalGoal, graph)
+		valueFramingsJSON := ""
+		if params.ValueFramings != nil {
+			vf := models.DomainValueFramings{
+				Financial:    params.ValueFramings.Financial,
+				Employment:   params.ValueFramings.Employment,
+				Intellectual: params.ValueFramings.Intellectual,
+				Innovation:   params.ValueFramings.Innovation,
+			}
+			if buf, merr := json.Marshal(vf); merr == nil {
+				valueFramingsJSON = string(buf)
+			}
+		}
+
+		domain, err := deps.Store.CreateDomainWithValueFramings(learnerID, params.Name, params.PersonalGoal, graph, valueFramingsJSON)
 		if err != nil {
 			deps.Logger.Error("init_domain: failed to create domain", "err", err, "learner", learnerID)
 			r, _ := errorResult(fmt.Sprintf("failed to create domain: %v", err))

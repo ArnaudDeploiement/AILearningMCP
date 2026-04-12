@@ -178,6 +178,21 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 			}
 		}
 
+		// Motivation layer — compose a context-adaptive brief for this activity.
+		// Detect plateau active on the chosen concept from the alerts list.
+		plateauActive := false
+		for _, a := range alerts {
+			if a.Type == models.AlertPlateau && a.Concept == activity.Concept {
+				plateauActive = true
+				break
+			}
+		}
+		motivationEngine := engine.NewMotivationEngine(deps.Store)
+		motivationBrief, _ := motivationEngine.Build(
+			learnerID, domain, activity.Concept, activity.Type,
+			plateauActive, len(sessionConcepts),
+		)
+
 		r, _ := jsonResult(map[string]any{
 			"needs_domain_setup":        false,
 			"domain_id":                 domain.ID,
@@ -187,6 +202,7 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 			"tutor_mode":               tutorMode,
 			"active_misconceptions":     activeMisconceptions,
 			"known_misconception_types": knownMisconceptionTypes,
+			"motivation_brief":          motivationBrief,
 		})
 		return r, nil, nil
 	})

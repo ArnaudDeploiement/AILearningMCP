@@ -17,12 +17,15 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 
 CREATE TABLE IF NOT EXISTS domains (
-    id            TEXT PRIMARY KEY,
-    learner_id    TEXT NOT NULL REFERENCES learners(id),
-    name          TEXT NOT NULL,
-    personal_goal TEXT DEFAULT '',
-    graph_json    TEXT NOT NULL,
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                   TEXT PRIMARY KEY,
+    learner_id           TEXT NOT NULL REFERENCES learners(id),
+    name                 TEXT NOT NULL,
+    personal_goal        TEXT DEFAULT '',
+    graph_json           TEXT NOT NULL,
+    value_framings_json  TEXT DEFAULT '',
+    last_value_axis      TEXT DEFAULT '',
+    archived             INTEGER DEFAULT 0,
+    created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS concept_states (
@@ -138,6 +141,32 @@ CREATE TABLE IF NOT EXISTS transfer_records (
     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Motivation layer (v0.10)
+
+CREATE TABLE IF NOT EXISTS implementation_intentions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id     TEXT    NOT NULL REFERENCES learners(id),
+    domain_id      TEXT    NOT NULL,
+    trigger_text   TEXT    NOT NULL,
+    action_text    TEXT    NOT NULL,
+    honored        INTEGER,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    scheduled_for  DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS webhook_message_queue (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id     TEXT    NOT NULL REFERENCES learners(id),
+    kind           TEXT    NOT NULL,
+    scheduled_for  DATETIME NOT NULL,
+    expires_at     DATETIME,
+    content        TEXT    NOT NULL,
+    priority       INTEGER DEFAULT 0,
+    status         TEXT    DEFAULT 'pending',
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at        DATETIME
+);
+
 CREATE INDEX IF NOT EXISTS idx_concept_states_learner
     ON concept_states(learner_id);
 
@@ -164,6 +193,12 @@ CREATE INDEX IF NOT EXISTS idx_calibration_records_learner
 
 CREATE INDEX IF NOT EXISTS idx_transfer_records_learner_concept
     ON transfer_records(learner_id, concept_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_impl_intent_learner
+    ON implementation_intentions(learner_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_wmq_dispatch
+    ON webhook_message_queue(learner_id, kind, status, scheduled_for);
 
 -- idx_interactions_self_initiated is created in idempotent migrations
 -- (must run after ALTER TABLE adds the self_initiated column)

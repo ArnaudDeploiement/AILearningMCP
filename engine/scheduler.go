@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"learning-runtime/algorithms"
 	"learning-runtime/db"
 	"learning-runtime/models"
 
@@ -183,12 +181,32 @@ func (s *Scheduler) sendReviewReminders() {
 }
 
 // ─── Daily Motivation (8h) ──────────────────────────────────────────────────
+//
+// The scheduler no longer composes motivational text. Claude authors messages
+// during sessions via queue_webhook_message, the scheduler dispatches from the
+// queue. If the queue is empty for a learner, we fall back to a sober one-liner
+// (no KPIs, no analytics bulletin tone).
 
 func (s *Scheduler) sendDailyMotivation() {
+	s.dispatchQueued("daily_motivation", "DAILY_MOTIVATION", fallbackDailyMotivation)
+}
+
+// ─── Daily Recap (21h) ─────────────────────────────────────────────────────
+
+func (s *Scheduler) sendDailyRecap() {
+	s.dispatchQueued("daily_recap", "DAILY_RECAP", fallbackDailyRecap)
+}
+
+// dispatchQueued pulls the best pending webhook message for each active learner
+// (kind + ±30min scheduling window) and posts it. Falls back to a sober template
+// when the queue is empty.
+func (s *Scheduler) dispatchQueued(kind, alertTag string, fallback func(*models.Learner) discordPayload) {
 	learners, err := s.store.GetActiveLearners()
 	if err != nil {
+		s.logger.Error("scheduler: dispatch get learners", "err", err, "kind", kind)
 		return
 	}
+	now := time.Now().UTC()
 
 	for _, learner := range learners {
 		if learner.WebhookURL == "" {
@@ -199,77 +217,92 @@ func (s *Scheduler) sendDailyMotivation() {
 			continue
 		}
 
-		streak, _ := s.store.GetDailyStreak(learner.ID)
-		states, _ := s.store.GetConceptStatesByLearner(learner.ID)
-		due, _ := s.store.GetConceptsDueForReview(learner.ID)
-
-		// Count mastered concepts
-		mastered := 0
-		total := len(states)
-		for _, cs := range states {
-			if cs.PMastery >= algorithms.BKTMasteryThreshold {
-				mastered++
-			}
-		}
-
-		// Compute day number
-		dayNumber := int(math.Floor(time.Since(learner.CreatedAt).Hours()/24)) + 1
-
-		msg := formatDailyMotivation(dayNumber, streak, mastered, total, len(due), learner.Objective)
-		if err := s.sendDiscordEmbed(learner.WebhookURL, msg); err != nil {
-			s.logger.Error("scheduler: motivation webhook", "err", err)
+		// Dedup at the alert layer — don't fire twice in one day.
+		sent, _ := s.store.WasAlertSentToday(learner.ID, alertTag)
+		if sent {
 			continue
 		}
-		s.store.CreateScheduledAlert(learner.ID, "DAILY_MOTIVATION", "", time.Now())
-		s.logger.Info("scheduler: motivation sent", "learner", learner.ID, "streak", streak)
+
+		item, err := s.store.DequeueNextPending(learner.ID, kind, now, 30*time.Minute)
+		if err != nil {
+			s.logger.Error("scheduler: dequeue", "err", err, "learner", learner.ID, "kind", kind)
+			continue
+		}
+
+		var payload discordPayload
+		var source string
+		if item != nil && item.Content != "" {
+			payload = discordPayload{Embeds: []discordEmbed{{
+				Title:       queueKindTitle(kind),
+				Description: item.Content,
+				Color:       queueKindColor(kind),
+			}}}
+			source = "queue"
+		} else if fallback != nil {
+			payload = fallback(learner)
+			source = "fallback"
+		} else {
+			continue
+		}
+
+		if err := s.sendDiscordEmbed(learner.WebhookURL, payload); err != nil {
+			s.logger.Error("scheduler: dispatch webhook", "err", err, "learner", learner.ID, "kind", kind)
+			if item != nil {
+				_ = s.store.MarkWebhookFailed(item.ID)
+			}
+			continue
+		}
+		if item != nil {
+			_ = s.store.MarkWebhookSent(item.ID, now)
+		}
+		s.store.CreateScheduledAlert(learner.ID, alertTag, "", time.Now())
+		s.logger.Info("scheduler: dispatched", "learner", learner.ID, "kind", kind, "source", source)
 	}
 }
 
-// ─── Daily Recap (21h) ─────────────────────────────────────────────────────
-
-func (s *Scheduler) sendDailyRecap() {
-	learners, err := s.store.GetActiveLearners()
-	if err != nil {
-		return
+// queueKindTitle returns the embed title for a given webhook kind.
+func queueKindTitle(kind string) string {
+	switch kind {
+	case "daily_motivation":
+		return "☀️ Bonjour"
+	case "daily_recap":
+		return "🌙 Ce soir"
+	case "reactivation":
+		return "👋 Reprends quand tu veux"
+	case "reminder":
+		return "📚 Note"
 	}
+	return "✉️ Message"
+}
 
-	for _, learner := range learners {
-		if learner.WebhookURL == "" {
-			continue
-		}
-
-		todayCount, _ := s.store.GetTodayInteractionCount(learner.ID)
-		if todayCount == 0 {
-			// No activity today — send a gentle nudge instead of recap
-			hoursSinceActive := time.Since(learner.LastActive).Hours()
-			if hoursSinceActive > 24 {
-				msg := formatInactivityNudge(hoursSinceActive)
-				s.sendDiscordEmbed(learner.WebhookURL, msg)
-				s.store.CreateScheduledAlert(learner.ID, "INACTIVITY_NUDGE", "", time.Now())
-			}
-			continue
-		}
-
-		successRate, total, _ := s.store.GetTodaySuccessRate(learner.ID)
-		streak, _ := s.store.GetDailyStreak(learner.ID)
-
-		// Find concepts worked on today
-		states, _ := s.store.GetConceptStatesByLearner(learner.ID)
-		mastered := 0
-		for _, cs := range states {
-			if cs.PMastery >= algorithms.BKTMasteryThreshold {
-				mastered++
-			}
-		}
-
-		msg := formatDailyRecap(total, successRate, streak, mastered, len(states))
-		if err := s.sendDiscordEmbed(learner.WebhookURL, msg); err != nil {
-			s.logger.Error("scheduler: recap webhook", "err", err)
-			continue
-		}
-		s.store.CreateScheduledAlert(learner.ID, "DAILY_RECAP", "", time.Now())
-		s.logger.Info("scheduler: recap sent", "learner", learner.ID, "exercises", total)
+func queueKindColor(kind string) int {
+	switch kind {
+	case "daily_motivation":
+		return 0x5865F2
+	case "daily_recap":
+		return 0x57F287
+	case "reactivation":
+		return 0xFEE75C
 	}
+	return 0x99AAB5
+}
+
+// ─── Sober fallback templates (no KPI, no analytics) ─────────────────────────
+
+func fallbackDailyMotivation(_ *models.Learner) discordPayload {
+	return discordPayload{Embeds: []discordEmbed{{
+		Title:       "☀️ Bonjour",
+		Description: "Meme 5 minutes aujourd'hui, ca tient la trajectoire. Reviens quand tu veux.",
+		Color:       0x5865F2,
+	}}}
+}
+
+func fallbackDailyRecap(_ *models.Learner) discordPayload {
+	return discordPayload{Embeds: []discordEmbed{{
+		Title:       "🌙 Ce soir",
+		Description: "Si tu passes, on continue. Sinon, a demain.",
+		Color:       0x57F287,
+	}}}
 }
 
 // ─── Cleanup (hourly) ─────────────────────────────────────────────────────
@@ -287,6 +320,13 @@ func (s *Scheduler) cleanupExpiredData() {
 		s.logger.Error("scheduler: cleanup tokens", "err", err)
 	} else if tokens > 0 {
 		s.logger.Info("scheduler: cleaned expired refresh tokens", "count", tokens)
+	}
+
+	expired, err := s.store.ExpirePastWebhookMessages(time.Now().UTC())
+	if err != nil {
+		s.logger.Error("scheduler: expire webhook queue", "err", err)
+	} else if expired > 0 {
+		s.logger.Info("scheduler: expired webhook messages", "count", expired)
 	}
 }
 
@@ -361,104 +401,9 @@ func formatReviewReminder(due []string, hoursSinceActive float64) discordPayload
 	}
 }
 
-func formatDailyMotivation(dayNumber, streak, mastered, total, dueCount int, objective string) discordPayload {
-	var lines []string
-
-	lines = append(lines, fmt.Sprintf("**Jour %d** de ton apprentissage", dayNumber))
-
-	if streak > 1 {
-		lines = append(lines, fmt.Sprintf("🔥 **%d jours consecutifs** — continue !", streak))
-	} else if streak == 1 {
-		lines = append(lines, "Hier c'etait bien. Enchaine aujourd'hui.")
-	} else {
-		lines = append(lines, "Nouvelle journee, nouveau depart. Une seule session suffit.")
-	}
-
-	if total > 0 {
-		pct := float64(mastered) / float64(total) * 100
-		lines = append(lines, fmt.Sprintf("📊 Progression : **%d/%d** concepts maitrises (%.0f%%)", mastered, total, pct))
-	}
-
-	if dueCount > 0 {
-		lines = append(lines, fmt.Sprintf("📋 %d concept(s) a reviser aujourd'hui", dueCount))
-	} else {
-		lines = append(lines, "✅ Rien a reviser — explore un nouveau concept")
-	}
-
-	if objective != "" {
-		lines = append(lines, fmt.Sprintf("\n🎯 *%s*", objective))
-	}
-
-	return discordPayload{
-		Embeds: []discordEmbed{{
-			Title:       "☀️ Bonne session",
-			Description: strings.Join(lines, "\n"),
-			Color:       0x5865F2, // discord blurple
-		}},
-	}
-}
-
-func formatDailyRecap(exerciseCount int, successRate float64, streak, mastered, total int) discordPayload {
-	var lines []string
-
-	lines = append(lines, fmt.Sprintf("**%d exercices** aujourd'hui", exerciseCount))
-
-	// Success rate with emoji
-	rateEmoji := "🟡"
-	if successRate >= 0.8 {
-		rateEmoji = "🟢"
-	} else if successRate < 0.5 {
-		rateEmoji = "🔴"
-	}
-	lines = append(lines, fmt.Sprintf("%s Taux de reussite : **%.0f%%**", rateEmoji, successRate*100))
-
-	if streak > 1 {
-		lines = append(lines, fmt.Sprintf("🔥 Streak : **%d jours**", streak))
-	}
-
-	if total > 0 {
-		pct := float64(mastered) / float64(total) * 100
-		lines = append(lines, fmt.Sprintf("📊 **%d/%d** concepts maitrises (%.0f%%)", mastered, total, pct))
-	}
-
-	// Encouragement based on performance
-	if successRate >= 0.8 && exerciseCount >= 5 {
-		lines = append(lines, "\n💪 Excellente session. Demain on pousse plus loin.")
-	} else if successRate >= 0.6 {
-		lines = append(lines, "\n👍 Bonne session. La regularite fait la difference.")
-	} else {
-		lines = append(lines, "\n🧠 Session difficile — c'est normal. Reviens demain, le cerveau consolide pendant la nuit.")
-	}
-
-	return discordPayload{
-		Embeds: []discordEmbed{{
-			Title:       "📊 Recap du jour",
-			Description: strings.Join(lines, "\n"),
-			Color:       0x57F287, // green
-		}},
-	}
-}
-
-func formatInactivityNudge(hoursSinceActive float64) discordPayload {
-	days := int(hoursSinceActive / 24)
-	var desc string
-	switch {
-	case days <= 1:
-		desc = "Tu n'as pas pratique aujourd'hui. Meme 5 minutes comptent."
-	case days <= 3:
-		desc = fmt.Sprintf("Ca fait **%d jours** sans session. Ta retention baisse — une revision rapide suffit pour inverser la courbe.", days)
-	default:
-		desc = fmt.Sprintf("**%d jours** d'absence. Pas de jugement — reviens quand tu veux. Une seule session relance tout.", days)
-	}
-
-	return discordPayload{
-		Embeds: []discordEmbed{{
-			Title:       "👋 On ne t'oublie pas",
-			Description: desc,
-			Color:       0xFEE75C, // yellow
-		}},
-	}
-}
+// Note: formatDailyMotivation / formatDailyRecap / formatInactivityNudge have been
+// removed. Daily motivation and recap are now authored by Claude via queue_webhook_message
+// and dispatched by dispatchQueued (with sober Go fallbacks when the queue is empty).
 
 // ─── Discord Webhook ─────────────────────────────────────────────────────────
 

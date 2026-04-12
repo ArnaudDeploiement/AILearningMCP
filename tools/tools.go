@@ -81,5 +81,7 @@ func RegisterTools(server *mcp.Server, deps *Deps) {
 	registerUnarchiveDomain(server, deps)
 	registerDeleteDomain(server, deps)
 	registerGetMisconceptions(server, deps)
+	registerRecordSessionClose(server, deps)
+	registerQueueWebhookMessage(server, deps)
 	RegisterPrompt(server)
 }

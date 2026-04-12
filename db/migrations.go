@@ -39,6 +39,8 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE domains ADD COLUMN archived INTEGER DEFAULT 0`,
 		`ALTER TABLE interactions ADD COLUMN misconception_type TEXT`,
 		`ALTER TABLE interactions ADD COLUMN misconception_detail TEXT`,
+		`ALTER TABLE domains ADD COLUMN value_framings_json TEXT DEFAULT ''`,
+		`ALTER TABLE domains ADD COLUMN last_value_axis TEXT DEFAULT ''`,
 	}
 	for _, m := range alterMigrations {
 		_, _ = db.Exec(m) // ignore "duplicate column" errors
@@ -101,6 +103,30 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_transfer_records_learner_concept ON transfer_records(learner_id, concept_id, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_interactions_self_initiated ON interactions(learner_id, self_initiated, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_interactions_misconception ON interactions(learner_id, concept, misconception_type)`,
+		`CREATE TABLE IF NOT EXISTS implementation_intentions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id     TEXT    NOT NULL REFERENCES learners(id),
+    domain_id      TEXT    NOT NULL,
+    trigger_text   TEXT    NOT NULL,
+    action_text    TEXT    NOT NULL,
+    honored        INTEGER,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    scheduled_for  DATETIME
+)`,
+		`CREATE TABLE IF NOT EXISTS webhook_message_queue (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    learner_id     TEXT    NOT NULL REFERENCES learners(id),
+    kind           TEXT    NOT NULL,
+    scheduled_for  DATETIME NOT NULL,
+    expires_at     DATETIME,
+    content        TEXT    NOT NULL,
+    priority       INTEGER DEFAULT 0,
+    status         TEXT    DEFAULT 'pending',
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at        DATETIME
+)`,
+		`CREATE INDEX IF NOT EXISTS idx_impl_intent_learner ON implementation_intentions(learner_id, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_wmq_dispatch ON webhook_message_queue(learner_id, kind, status, scheduled_for)`,
 	}
 	for _, m := range idempotentMigrations {
 		if _, err := db.Exec(m); err != nil {

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"learning-runtime/algorithms"
+	"learning-runtime/engine"
+	"learning-runtime/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -112,6 +114,12 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 			archivedList = []map[string]interface{}{}
 		}
 
+		// Progress narrative — open learner model surfaced at session start.
+		var narrative *models.ProgressNarrative
+		if !needsDomainSetup && domain != nil {
+			narrative = buildProgressNarrative(deps, learnerID, learner, domain)
+		}
+
 		r, _ := jsonResult(map[string]interface{}{
 			"learner_id":         learnerID,
 			"objective":          learner.Objective,
@@ -125,7 +133,48 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 			"priority_retention": priorityRetention,
 			"domains":            domainList,
 			"archived_domains":   archivedList,
+			"progress_narrative": narrative,
 		})
 		return r, nil, nil
 	})
+}
+
+// buildProgressNarrative composes the session-opening OLM narrative signals. Returns
+// nil if there's nothing meaningful to narrate (e.g., zero interactions so far).
+func buildProgressNarrative(deps *Deps, learnerID string, learner *models.Learner, domain *models.Domain) *models.ProgressNarrative {
+	window := 30 * 24 * time.Hour
+	since := time.Now().UTC().Add(-window)
+
+	deltas, _ := deps.Store.ConceptMasteryDelta(learnerID, domain.Graph.Concepts, since, 3)
+	streak, _ := deps.Store.CountLearnerSessionStreak(learnerID)
+	milestones, _ := deps.Store.MilestonesInWindow(learnerID, domain.Graph.Concepts, time.Now().UTC().Add(-7*24*time.Hour))
+
+	trend := "stable"
+	affects, _ := deps.Store.GetRecentAffectStates(learnerID, 5)
+	if len(affects) >= 3 {
+		var scores []float64
+		for _, a := range affects {
+			scores = append(scores, a.AutonomyScore)
+		}
+		trend = engine.ComputeAutonomyTrendExported(scores)
+	}
+
+	dormancy := false
+	if !learner.LastActive.IsZero() && time.Since(learner.LastActive) > 24*time.Hour {
+		dormancy = true
+	}
+
+	// Only return a narrative if there's something to say.
+	if len(deltas) == 0 && streak == 0 && len(milestones) == 0 && !dormancy {
+		return nil
+	}
+
+	return &models.ProgressNarrative{
+		MasteryTrajectory:  deltas,
+		SessionStreak:      streak,
+		AutonomyTrend:      trend,
+		MilestonesThisWeek: milestones,
+		DormancyImminent:   dormancy,
+		Instruction:        "Raconte la trajectoire en 1-2 phrases, pas une liste. Si dormancy_imminent est vrai, formule une reprise accueillante sans reproche.",
+	}
 }
