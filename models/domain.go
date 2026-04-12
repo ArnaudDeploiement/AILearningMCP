@@ -63,13 +63,15 @@ type KnowledgeSpace struct {
 }
 
 type Domain struct {
-	ID           string
-	LearnerID    string
-	Name         string
-	PersonalGoal string
-	Graph        KnowledgeSpace
-	Archived     bool
-	CreatedAt    time.Time
+	ID                 string
+	LearnerID          string
+	Name               string
+	PersonalGoal       string
+	Graph              KnowledgeSpace
+	ValueFramingsJSON  string
+	LastValueAxis      string
+	Archived           bool
+	CreatedAt          time.Time
 }
 
 type TimeWindow struct {

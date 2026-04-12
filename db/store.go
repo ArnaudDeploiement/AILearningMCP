@@ -204,6 +204,12 @@ func (s *Store) DeleteRefreshToken(token string) error {
 // ─── Domains ──────────────────────────────────────────────────────────────────
 
 func (s *Store) CreateDomain(learnerID, name, personalGoal string, graph models.KnowledgeSpace) (*models.Domain, error) {
+	return s.CreateDomainWithValueFramings(learnerID, name, personalGoal, graph, "")
+}
+
+// CreateDomainWithValueFramings creates a domain and optionally persists a JSON-encoded
+// set of value framings (4 axes: financial, employment, intellectual, innovation).
+func (s *Store) CreateDomainWithValueFramings(learnerID, name, personalGoal string, graph models.KnowledgeSpace, valueFramingsJSON string) (*models.Domain, error) {
 	id := generateID()
 	now := time.Now().UTC()
 
@@ -213,62 +219,93 @@ func (s *Store) CreateDomain(learnerID, name, personalGoal string, graph models.
 	}
 
 	_, err = s.db.Exec(
-		`INSERT INTO domains (id, learner_id, name, personal_goal, graph_json, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		id, learnerID, name, personalGoal, string(graphJSON), now,
+		`INSERT INTO domains (id, learner_id, name, personal_goal, graph_json, value_framings_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, learnerID, name, personalGoal, string(graphJSON), valueFramingsJSON, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create domain: %w", err)
 	}
 	return &models.Domain{
-		ID:           id,
-		LearnerID:    learnerID,
-		Name:         name,
-		PersonalGoal: personalGoal,
-		Graph:        graph,
-		CreatedAt:    now,
+		ID:                id,
+		LearnerID:         learnerID,
+		Name:              name,
+		PersonalGoal:      personalGoal,
+		Graph:             graph,
+		ValueFramingsJSON: valueFramingsJSON,
+		CreatedAt:         now,
 	}, nil
 }
 
-func (s *Store) GetDomainByLearner(learnerID string) (*models.Domain, error) {
+const domainCols = `id, learner_id, name, personal_goal, graph_json, value_framings_json, last_value_axis, archived, created_at`
+
+func scanDomainRow(row *sql.Row) (*models.Domain, error) {
 	d := &models.Domain{}
 	var graphJSON string
+	var valueFramings, lastAxis sql.NullString
 	var archived int
-	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
-		 FROM domains WHERE learner_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT 1`,
-		learnerID,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt)
+	err := row.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &valueFramings, &lastAxis, &archived, &d.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("get domain by learner: %w", err)
+		return nil, err
 	}
 	d.Archived = archived != 0
+	if valueFramings.Valid {
+		d.ValueFramingsJSON = valueFramings.String
+	}
+	if lastAxis.Valid {
+		d.LastValueAxis = lastAxis.String
+	}
 	if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
 		return nil, fmt.Errorf("unmarshal graph: %w", err)
+	}
+	return d, nil
+}
+
+func scanDomainRows(rows *sql.Rows) (*models.Domain, error) {
+	d := &models.Domain{}
+	var graphJSON string
+	var valueFramings, lastAxis sql.NullString
+	var archived int
+	err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &valueFramings, &lastAxis, &archived, &d.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	d.Archived = archived != 0
+	if valueFramings.Valid {
+		d.ValueFramingsJSON = valueFramings.String
+	}
+	if lastAxis.Valid {
+		d.LastValueAxis = lastAxis.String
+	}
+	if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
+		return nil, fmt.Errorf("unmarshal graph: %w", err)
+	}
+	return d, nil
+}
+
+func (s *Store) GetDomainByLearner(learnerID string) (*models.Domain, error) {
+	row := s.db.QueryRow(
+		`SELECT `+domainCols+` FROM domains WHERE learner_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT 1`,
+		learnerID,
+	)
+	d, err := scanDomainRow(row)
+	if err != nil {
+		return nil, fmt.Errorf("get domain by learner: %w", err)
 	}
 	return d, nil
 }
 
 func (s *Store) GetDomainByID(id string) (*models.Domain, error) {
-	d := &models.Domain{}
-	var graphJSON string
-	var archived int
-	err := s.db.QueryRow(
-		`SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
-		 FROM domains WHERE id = ?`, id,
-	).Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt)
+	row := s.db.QueryRow(`SELECT `+domainCols+` FROM domains WHERE id = ?`, id)
+	d, err := scanDomainRow(row)
 	if err != nil {
 		return nil, fmt.Errorf("get domain by id: %w", err)
-	}
-	d.Archived = archived != 0
-	if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
-		return nil, fmt.Errorf("unmarshal graph: %w", err)
 	}
 	return d, nil
 }
 
 func (s *Store) GetDomainsByLearner(learnerID string, includeArchived bool) ([]*models.Domain, error) {
-	query := `SELECT id, learner_id, name, personal_goal, graph_json, archived, created_at
-		 FROM domains WHERE learner_id = ?`
+	query := `SELECT ` + domainCols + ` FROM domains WHERE learner_id = ?`
 	if !includeArchived {
 		query += ` AND archived = 0`
 	}
@@ -281,19 +318,37 @@ func (s *Store) GetDomainsByLearner(learnerID string, includeArchived bool) ([]*
 
 	var domains []*models.Domain
 	for rows.Next() {
-		d := &models.Domain{}
-		var graphJSON string
-		var archived int
-		if err := rows.Scan(&d.ID, &d.LearnerID, &d.Name, &d.PersonalGoal, &graphJSON, &archived, &d.CreatedAt); err != nil {
+		d, err := scanDomainRows(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan domain row: %w", err)
-		}
-		d.Archived = archived != 0
-		if err := json.Unmarshal([]byte(graphJSON), &d.Graph); err != nil {
-			return nil, fmt.Errorf("unmarshal graph: %w", err)
 		}
 		domains = append(domains, d)
 	}
 	return domains, rows.Err()
+}
+
+// UpdateDomainValueFramings stores the JSON-encoded value framings for a domain.
+func (s *Store) UpdateDomainValueFramings(domainID, valueFramingsJSON string) error {
+	_, err := s.db.Exec(
+		`UPDATE domains SET value_framings_json = ? WHERE id = ?`,
+		valueFramingsJSON, domainID,
+	)
+	if err != nil {
+		return fmt.Errorf("update domain value framings: %w", err)
+	}
+	return nil
+}
+
+// UpdateDomainLastValueAxis records which axis was surfaced most recently (used for rotation).
+func (s *Store) UpdateDomainLastValueAxis(domainID, axis string) error {
+	_, err := s.db.Exec(
+		`UPDATE domains SET last_value_axis = ? WHERE id = ?`,
+		axis, domainID,
+	)
+	if err != nil {
+		return fmt.Errorf("update domain last value axis: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) UpdateDomainGraph(domainID string, graph models.KnowledgeSpace) error {
