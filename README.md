@@ -4,7 +4,7 @@ An adaptive learning engine exposed as a [Model Context Protocol (MCP)](https://
 
 ## How It Works
 
-The server sits between a learner and an LLM (e.g. Claude). Two parallel loops run from the first session:
+The server sits between a learner and an LLM. Two parallel loops run from the first session:
 
 **Learning loop** (what to learn, when) — The LLM calls MCP tools before and after every exchange to check alerts, get the next optimal activity, and record interactions. Four cognitive algorithms update the learner model in real time. The LLM never invents its own scheduling.
 
