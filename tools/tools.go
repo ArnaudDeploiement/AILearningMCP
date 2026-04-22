@@ -27,6 +27,37 @@ func getLearnerID(ctx context.Context) (string, error) {
 	return id, nil
 }
 
+// filterStatesByConcepts returns only the states whose concept is in the set.
+// An empty set means "no active domains" → returns nil so callers don't surface
+// orphan history (e.g. priority_concept stays empty when the learner has no
+// domain configured).
+func filterStatesByConcepts(states []*models.ConceptState, set map[string]bool) []*models.ConceptState {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]*models.ConceptState, 0, len(states))
+	for _, cs := range states {
+		if set[cs.Concept] {
+			out = append(out, cs)
+		}
+	}
+	return out
+}
+
+// filterInteractionsByConcepts mirrors filterStatesByConcepts for interactions.
+func filterInteractionsByConcepts(interactions []*models.Interaction, set map[string]bool) []*models.Interaction {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]*models.Interaction, 0, len(interactions))
+	for _, i := range interactions {
+		if set[i.Concept] {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // resolveDomain resolves a domain by ID or falls back to the learner's most recent domain.
 func resolveDomain(store *db.Store, learnerID, domainID string) (*models.Domain, error) {
 	if domainID != "" {

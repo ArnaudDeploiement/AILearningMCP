@@ -396,6 +396,24 @@ func (s *Store) UnarchiveDomain(domainID, learnerID string) error {
 	return nil
 }
 
+// ActiveDomainConceptSet returns the set of concepts that belong to at least
+// one non-archived domain owned by the learner. Used by readers to filter out
+// orphan concept_states / interactions left behind by delete_domain (which
+// intentionally preserves history but removes the domain row).
+func (s *Store) ActiveDomainConceptSet(learnerID string) (map[string]bool, error) {
+	domains, err := s.GetDomainsByLearner(learnerID, false)
+	if err != nil {
+		return nil, fmt.Errorf("active domain concept set: %w", err)
+	}
+	set := make(map[string]bool)
+	for _, d := range domains {
+		for _, c := range d.Graph.Concepts {
+			set[c] = true
+		}
+	}
+	return set, nil
+}
+
 func (s *Store) DeleteDomain(domainID, learnerID string) error {
 	result, err := s.db.Exec(
 		`DELETE FROM domains WHERE id = ? AND learner_id = ?`,

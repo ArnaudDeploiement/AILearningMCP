@@ -43,6 +43,14 @@ func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 		states, _ := deps.Store.GetConceptStatesByLearner(learnerID)
 		interactions, _ := deps.Store.GetRecentInteractionsByLearner(learnerID, 10)
 
+		// Filter out orphan states/interactions left over from deleted or
+		// archived domains — only surface concepts that still belong to an
+		// active domain. Without this, priority_concept and opening_message
+		// can reference ghost concepts (see bug report from cosmos client).
+		activeConcepts, _ := deps.Store.ActiveDomainConceptSet(learnerID)
+		states = filterStatesByConcepts(states, activeConcepts)
+		interactions = filterInteractionsByConcepts(interactions, activeConcepts)
+
 		// Compute day number since account creation (day 1 = creation day)
 		dayNumber := int(math.Floor(time.Since(learner.CreatedAt).Hours()/24)) + 1
 
