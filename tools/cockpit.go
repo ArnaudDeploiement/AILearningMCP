@@ -181,8 +181,19 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			totalConcepts += len(domain.Graph.Concepts)
 		}
 
-		// Global alerts
-		alerts := engine.ComputeAlerts(states, interactions, sessionStart)
+		// Global alerts — restrict to concepts that belong to a domain shown
+		// in this response. Otherwise orphan states from deleted domains (which
+		// intentionally preserve concept_states / interactions) would surface as
+		// alerts on concepts the user no longer has.
+		shownConcepts := make(map[string]bool)
+		for _, d := range domains {
+			for _, c := range d.Graph.Concepts {
+				shownConcepts[c] = true
+			}
+		}
+		alertStates := filterStatesByConcepts(states, shownConcepts)
+		alertInteractions := filterInteractionsByConcepts(interactions, shownConcepts)
+		alerts := engine.ComputeAlerts(alertStates, alertInteractions, sessionStart)
 		if alerts == nil {
 			alerts = []models.Alert{}
 		}
