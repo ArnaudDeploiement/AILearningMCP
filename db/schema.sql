@@ -100,10 +100,11 @@ CREATE TABLE IF NOT EXISTS oauth_codes (
 );
 
 CREATE TABLE IF NOT EXISTS oauth_clients (
-    client_id      TEXT PRIMARY KEY,
-    client_name    TEXT DEFAULT '',
-    redirect_uris  TEXT DEFAULT '[]',
-    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+    client_id          TEXT PRIMARY KEY,
+    client_name        TEXT DEFAULT '',
+    redirect_uris      TEXT DEFAULT '[]',
+    client_secret_hash TEXT DEFAULT '',
+    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Metacognitive loop tables (v0.9)

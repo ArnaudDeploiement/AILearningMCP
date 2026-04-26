@@ -933,10 +933,12 @@ type AuthCode struct {
 
 // OAuthClient is a dynamically-registered OAuth client.
 // RedirectURIs holds the JSON array as persisted.
+// ClientSecretHash is hex-encoded SHA-256 of the secret; empty for public (PKCE-only) clients.
 type OAuthClient struct {
-	ClientID     string
-	ClientName   string
-	RedirectURIs string
+	ClientID         string
+	ClientName       string
+	RedirectURIs     string
+	ClientSecretHash string
 }
 
 func (s *Store) CreateAuthCode(code, learnerID, codeChallenge, clientID string, expiresAt time.Time) error {
@@ -982,9 +984,15 @@ func (s *Store) ConsumeAuthCode(code, clientID string) (*AuthCode, error) {
 }
 
 func (s *Store) CreateOAuthClient(clientID, clientName, redirectURIs string) error {
+	return s.CreateOAuthClientWithSecret(clientID, clientName, redirectURIs, "")
+}
+
+// CreateOAuthClientWithSecret persists a confidential client when secretHash != "".
+// secretHash should be hex-encoded SHA-256 of the issued secret; pass "" for public (PKCE) clients.
+func (s *Store) CreateOAuthClientWithSecret(clientID, clientName, redirectURIs, secretHash string) error {
 	_, err := s.db.Exec(
-		`INSERT INTO oauth_clients (client_id, client_name, redirect_uris) VALUES (?, ?, ?)`,
-		clientID, clientName, redirectURIs,
+		`INSERT INTO oauth_clients (client_id, client_name, redirect_uris, client_secret_hash) VALUES (?, ?, ?, ?)`,
+		clientID, clientName, redirectURIs, secretHash,
 	)
 	if err != nil {
 		return fmt.Errorf("create oauth client: %w", err)
@@ -994,12 +1002,16 @@ func (s *Store) CreateOAuthClient(clientID, clientName, redirectURIs string) err
 
 func (s *Store) GetOAuthClient(clientID string) (*OAuthClient, error) {
 	c := &OAuthClient{}
+	var secretHash sql.NullString
 	err := s.db.QueryRow(
-		`SELECT client_id, client_name, redirect_uris FROM oauth_clients WHERE client_id = ?`,
+		`SELECT client_id, client_name, redirect_uris, client_secret_hash FROM oauth_clients WHERE client_id = ?`,
 		clientID,
-	).Scan(&c.ClientID, &c.ClientName, &c.RedirectURIs)
+	).Scan(&c.ClientID, &c.ClientName, &c.RedirectURIs, &secretHash)
 	if err != nil {
 		return nil, fmt.Errorf("get oauth client: %w", err)
+	}
+	if secretHash.Valid {
+		c.ClientSecretHash = secretHash.String
 	}
 	return c, nil
 }

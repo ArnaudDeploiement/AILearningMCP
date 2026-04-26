@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -54,7 +55,9 @@ func (s *OAuthServer) HandleAuthServerMetadata(w http.ResponseWriter, r *http.Re
 		"code_challenge_methods_supported":      []string{"S256"},
 		"scopes_supported":                      []string{"learner"},
 		"registration_endpoint":                    s.baseURL + "/register",
-		"token_endpoint_auth_methods_supported":    []string{"none"},
+		"token_endpoint_auth_methods_supported":    []string{"none", "client_secret_basic", "client_secret_post"},
+		// RFC 9207: we include iss in authorization responses.
+		"authorization_response_iss_parameter_supported": true,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(meta)
@@ -101,6 +104,8 @@ func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid redirect_uri: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	s.logger.Info("authorize GET", "client_id", clientID, "state_len", len(q.Get("state")), "state_sample", truncate(q.Get("state"), 80))
 
 	csrfToken, err := generateCSRFToken()
 	if err != nil {
@@ -235,11 +240,56 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	redirectURL := redirectURI + "?code=" + code
-	if state != "" {
-		redirectURL += "&state=" + state
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		s.logger.Error("parse redirect_uri failed", "err", err)
+		renderAuthPage(w, data, "Internal error. Please try again.", mode)
+		return
 	}
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	qv := u.Query()
+	qv.Set("code", code)
+	if state != "" {
+		qv.Set("state", state)
+	}
+	// RFC 9207 mix-up mitigation: clients (e.g. Mistral) may require iss in the callback.
+	qv.Set("iss", s.baseURL)
+	u.RawQuery = qv.Encode()
+	s.logger.Info("authorize POST redirect", "state_len", len(state), "state_sample", truncate(state, 80), "redirect_url", u.String())
+	http.Redirect(w, r, u.String(), http.StatusFound)
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
+
+// extractClientCredentials returns (client_id, client_secret) using HTTP Basic
+// (client_secret_basic) first, then falling back to form fields (client_secret_post).
+// Either or both may be empty if not supplied.
+func extractClientCredentials(r *http.Request) (string, string) {
+	if id, secret, ok := r.BasicAuth(); ok {
+		return id, secret
+	}
+	return r.FormValue("client_id"), r.FormValue("client_secret")
+}
+
+// verifyClientAuth enforces secret-based authentication for confidential clients.
+// Public clients (empty stored hash) pass through and rely on PKCE.
+func verifyClientAuth(client *db.OAuthClient, suppliedSecret string) error {
+	if client.ClientSecretHash == "" {
+		return nil
+	}
+	if suppliedSecret == "" {
+		return fmt.Errorf("invalid_client")
+	}
+	sum := sha256.Sum256([]byte(suppliedSecret))
+	got := hex.EncodeToString(sum[:])
+	if subtle.ConstantTimeCompare([]byte(got), []byte(client.ClientSecretHash)) != 1 {
+		return fmt.Errorf("invalid_client")
+	}
+	return nil
 }
 
 func (s *OAuthServer) HandleToken(w http.ResponseWriter, r *http.Request) {
@@ -263,13 +313,25 @@ func (s *OAuthServer) HandleToken(w http.ResponseWriter, r *http.Request) {
 func (s *OAuthServer) handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	codeVerifier := r.FormValue("code_verifier")
-	clientID := r.FormValue("client_id")
+	clientID, clientSecret := extractClientCredentials(r)
 
 	s.logger.Debug("token exchange attempt", "code_len", len(code), "verifier_len", len(codeVerifier), "client_id", clientID)
 
 	if code == "" || codeVerifier == "" || clientID == "" {
 		s.logger.Debug("token exchange: missing code, verifier or client_id")
 		writeTokenError(w, "invalid_request", http.StatusBadRequest)
+		return
+	}
+
+	client, err := s.store.GetOAuthClient(clientID)
+	if err != nil {
+		s.logger.Debug("token exchange: unknown client", "client_id", clientID)
+		writeTokenError(w, "invalid_client", http.StatusUnauthorized)
+		return
+	}
+	if err := verifyClientAuth(client, clientSecret); err != nil {
+		s.logger.Debug("token exchange: client auth failed", "client_id", clientID)
+		writeTokenError(w, "invalid_client", http.StatusUnauthorized)
 		return
 	}
 
@@ -314,6 +376,21 @@ func (s *OAuthServer) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Confidential clients must authenticate on refresh too. Public clients
+	// (no client_id supplied) keep the existing PKCE-only flow.
+	clientID, clientSecret := extractClientCredentials(r)
+	if clientID != "" {
+		client, err := s.store.GetOAuthClient(clientID)
+		if err != nil {
+			writeTokenError(w, "invalid_client", http.StatusUnauthorized)
+			return
+		}
+		if err := verifyClientAuth(client, clientSecret); err != nil {
+			writeTokenError(w, "invalid_client", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	rt, err := s.store.GetRefreshToken(refreshToken)
 	if err != nil {
 		writeTokenError(w, "invalid_grant", http.StatusBadRequest)
@@ -346,6 +423,8 @@ func (s *OAuthServer) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Req
 
 func writeTokenResponse(w http.ResponseWriter, accessToken, refreshToken string) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"access_token":  accessToken,
 		"token_type":    "bearer",
@@ -433,7 +512,15 @@ func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	if name, ok := req["client_name"].(string); ok {
 		clientName = name
 	}
-	s.logger.Info("dynamic client registration request", "client_name", clientName)
+
+	// RFC 7591: confidential clients announce a secret-based auth method.
+	authMethod := "none"
+	if m, ok := req["token_endpoint_auth_method"].(string); ok && m != "" {
+		authMethod = m
+	}
+	confidential := authMethod == "client_secret_basic" || authMethod == "client_secret_post"
+
+	s.logger.Info("dynamic client registration request", "client_name", clientName, "auth_method", authMethod, "raw_keys", mapKeys(req))
 
 	var uris []string
 	if raw, ok := req["redirect_uris"]; ok {
@@ -445,6 +532,7 @@ func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	s.logger.Info("registration redirect_uris", "uris", uris)
 	if len(uris) == 0 {
 		writeRegistrationError(w, "invalid_redirect_uri", "at least one redirect_uri required")
 		return
@@ -465,7 +553,19 @@ func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
 		return
 	}
-	if err := s.store.CreateOAuthClient(clientID, clientName, string(redirectURIsJSON)); err != nil {
+
+	var clientSecret, secretHash string
+	if confidential {
+		clientSecret, err = generateCode()
+		if err != nil {
+			http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
+			return
+		}
+		sum := sha256.Sum256([]byte(clientSecret))
+		secretHash = hex.EncodeToString(sum[:])
+	}
+
+	if err := s.store.CreateOAuthClientWithSecret(clientID, clientName, string(redirectURIsJSON), secretHash); err != nil {
 		s.logger.Error("persist client registration failed", "err", err)
 		http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
 		return
@@ -479,15 +579,40 @@ func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		"redirect_uris":              uris,
 		"grant_types":                []string{"authorization_code", "refresh_token"},
 		"response_types":             []string{"code"},
-		"token_endpoint_auth_method": "none",
+		"token_endpoint_auth_method": authMethod,
 		"scope":                      "learner",
 	}
+	if confidential {
+		resp["client_secret"] = clientSecret
+		// 0 = secret never expires (RFC 7591 §3.2.1)
+		resp["client_secret_expires_at"] = 0
+	}
 
-	s.logger.Info("dynamic client registered", "client_id", clientID)
+	// RFC 7592 hint fields. Some clients (e.g. Mistral Le Chat) reject the
+	// registration response with "Missing oauth2 metadata secrets" when these
+	// are absent, even though they never call the configuration endpoint.
+	registrationToken, err := generateCode()
+	if err == nil {
+		resp["registration_access_token"] = registrationToken
+		resp["registration_client_uri"] = s.baseURL + "/register/" + clientID
+	}
 
+	s.logger.Info("dynamic client registered", "client_id", clientID, "confidential", confidential)
+
+	// RFC 6749 §5.1: responses with credentials must not be cached.
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func mapKeys(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }
 
 func writeRegistrationError(w http.ResponseWriter, errCode, desc string) {
