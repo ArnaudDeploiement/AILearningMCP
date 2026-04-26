@@ -194,46 +194,46 @@ export LOG_LEVEL=debug        # debug | info | warn | error
 go build -o learning-runtime && ./learning-runtime
 ```
 
-## Capacité & Dimensionnement
+## Capacity & Sizing
 
-Cette implémentation est volontairement **single-tenant, mono-nœud** — une brique open-source à auto-héberger pour soi, un petit groupe ou une organisation modeste. Pas de cluster, pas de multi-writer : SQLite + scheduler in-process.
+This implementation is intentionally **single-tenant, single-node** — an open-source brick meant to be self-hosted for yourself, a small group, or a modest organisation. No cluster, no multi-writer: SQLite + in-process scheduler.
 
-Les chiffres ci-dessous intègrent un buffer de sécurité (~50 %) par rapport aux limites théoriques. Au-delà, il faut passer à Postgres + scheduler externalisé.
+The figures below include a safety buffer (~50%) against the theoretical limits. Beyond that, you'd need to switch to Postgres + an externalised scheduler.
 
-| Profil | Apprenants actifs / jour | Apprenants enregistrés | Usage |
-|--------|--------------------------|------------------------|-------|
-| **Personnel** | 1 | 1–5 | usage individuel |
-| **Petit groupe** (famille, équipe) | 1–10 | jusqu'à 30 | usage régulier |
-| **Classe / atelier** | 10–50 | jusqu'à 150 | sessions encadrées |
-| **Petit organisme** | 50–200 | jusqu'à 600 | charge soutenue |
+| Profile | Active learners / day | Registered learners | Usage |
+|---------|----------------------|---------------------|-------|
+| **Personal** | 1 | 1–5 | individual use |
+| **Small group** (family, team) | 1–10 | up to 30 | regular use |
+| **Classroom / workshop** | 10–50 | up to 150 | facilitated sessions |
+| **Small organisation** | 50–200 | up to 600 | sustained load |
 
-> **Plafond dur recommandé : ~200 apprenants actifs simultanés.** Au-delà, le tick de 30 min du scheduler et la sérialisation des écritures SQLite (WAL = un seul writer) deviennent le facteur limitant.
+> **Recommended hard ceiling: ~200 concurrent active learners.** Beyond that, the scheduler's 30-minute tick and SQLite's serialised writes (WAL = single writer) become the limiting factor.
 
-## Configuration serveur
+## Server Configuration
 
-### Minimum (usage personnel ou petit groupe ≤10)
+### Minimum (personal use or small group ≤10)
 
-- **CPU** : 1 vCPU
-- **RAM** : 512 MB
-- **Disque** : 2 GB SSD (binaire ~15 MB + DB qui grossit lentement)
-- **OS** : Linux moderne (Debian 12+, Ubuntu 22.04+, Alpine)
-- **Réseau** : sortie Internet pour les webhooks Discord
-- **Exemples** : Raspberry Pi 4, VPS à 5 €/mois, container LXC
+- **CPU**: 1 vCPU
+- **RAM**: 512 MB
+- **Disk**: 2 GB SSD (binary ~15 MB + DB that grows slowly)
+- **OS**: modern Linux (Debian 12+, Ubuntu 22.04+, Alpine)
+- **Network**: outbound Internet for Discord webhooks
+- **Examples**: Raspberry Pi 4, €5/month VPS, LXC container
 
-### Recommandé (jusqu'à 200 apprenants actifs)
+### Recommended (up to 200 active learners)
 
-- **CPU** : 2 vCPU
-- **RAM** : 2 GB
-- **Disque** : 20 GB SSD (la table `interactions` croît de quelques KB par apprenant et par jour)
-- **OS** : Linux moderne avec systemd
-- **Reverse proxy** : Caddy ou Nginx pour TLS, ou Tailscale Funnel
-- **Sauvegarde** : snapshot quotidien de `data/runtime.db` (en mode WAL : copier `runtime.db` + `runtime.db-wal` ou utiliser `sqlite3 .backup`)
+- **CPU**: 2 vCPU
+- **RAM**: 2 GB
+- **Disk**: 20 GB SSD (the `interactions` table grows by a few KB per learner per day)
+- **OS**: modern Linux with systemd
+- **Reverse proxy**: Caddy or Nginx for TLS, or Tailscale Funnel
+- **Backup**: daily snapshot of `data/runtime.db` (in WAL mode: copy `runtime.db` + `runtime.db-wal` or use `sqlite3 .backup`)
 
-### Empreinte au repos
+### Idle footprint
 
-- Binaire Go : ~15 MB sur disque, ~30 MB RSS
-- Base SQLite WAL : ~10 MB initial, +~50 KB par apprenant actif et par mois
-- Aucune dépendance externe : pas de Redis, pas de broker, pas de second processus — tout tient dans le binaire et le fichier `.db`
+- Go binary: ~15 MB on disk, ~30 MB RSS
+- SQLite WAL database: ~10 MB initial, +~50 KB per active learner per month
+- No external dependencies: no Redis, no broker, no second process — everything fits in the binary and the `.db` file
 
 ## Tech Stack
 
