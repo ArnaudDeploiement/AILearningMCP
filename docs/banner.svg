@@ -73,9 +73,8 @@
   <!-- PITCH -->
   <text x="88" y="392" class="sans" font-size="22" fill="#f5ede5" fill-opacity="0.85">
     <tspan x="88" dy="0" font-weight="600" fill="#f5ede5" fill-opacity="1">A Model Context Protocol server that turns your AI into a super-intelligent tutor.</tspan>
-    <tspan x="88" dy="33">Tell it what you want to learn — and five cognitive-science algorithms decide</tspan>
-    <tspan x="88" dy="33" fill="#f3a875" font-weight="500">what to study, when to review, and how hard the next exercise should be,</tspan>
-    <tspan x="88" dy="33">until you don't need it anymore.</tspan>
+    <tspan x="88" dy="33">Tell it what you want to learn — five cognitive-science algorithms decide</tspan>
+    <tspan x="88" dy="33" fill="#f3a875" font-weight="500">what to study, when to review, and how hard the next exercise should be.</tspan>
   </text>
 
   <!-- FOOTER divider -->
