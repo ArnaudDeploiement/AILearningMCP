@@ -263,7 +263,7 @@ The figures below include a safety buffer (~50%) against the theoretical limits.
 - **RAM**: 2 GB
 - **Disk**: 20 GB SSD (the `interactions` table grows by a few KB per learner per day)
 - **OS**: modern Linux with systemd
-- **Reverse proxy**: Caddy or Nginx for TLS, or Tailscale Funnel
+- **Reverse proxy**: Caddy, Nginx, or Traefik for TLS
 - **Backup**: daily snapshot of `data/runtime.db` (in WAL mode: copy `runtime.db` + `runtime.db-wal` or use `sqlite3 .backup`)
 
 ### Idle footprint

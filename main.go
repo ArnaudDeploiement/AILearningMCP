@@ -64,7 +64,7 @@ func main() {
 	deps := &tools.Deps{Store: store, Logger: logger}
 	tools.RegisterTools(mcpServer, deps)
 
-	// Create MCP handler — disable localhost protection (behind Tailscale Funnel)
+	// Create MCP handler — disable localhost protection (server is reached via a public reverse proxy)
 	// and allow Claude.ai cross-origin requests
 	cop := http.NewCrossOriginProtection()
 	cop.AddTrustedOrigin("https://claude.ai")
