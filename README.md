@@ -181,6 +181,10 @@ main.go              HTTP server, MCP handler, OAuth, scheduler startup
 
 ## Running
 
+### Setup workflow
+
+1. **Build and start the server**
+
 ```bash
 # Required
 export JWT_SECRET="your-secret-key"
@@ -193,6 +197,24 @@ export LOG_LEVEL=debug        # debug | info | warn | error
 
 go build -o learning-runtime && ./learning-runtime
 ```
+
+
+2. **Register / log in** — open `http://localhost:3000/authorize` in a browser. The page shows a login form; click **"Create one"** to toggle to the registration form (email + password). Existing users log in directly. This issues a JWT that Claude Code exchanges automatically on each session.
+
+3. **Wire Claude Code** — add a `.mcp.json` in your project root (or `~/.claude/mcp.json` for global use):
+
+```json
+{
+  "mcpServers": {
+    "learning-runtime": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+4. **Verify** — `curl http://localhost:3000/health` should return `{"status":"ok"}`.
 
 ## Capacity & Sizing
 
