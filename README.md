@@ -1,5 +1,6 @@
-<img src="https://github.com/ArnaudGuiovanna/learning-runtime/blob/main/learning-runtime-banner.png" alt="Learning Runtime - MCP version 1.0 - Arnaud Guiovanna">
-
+<p align="center">
+  <img src="docs/banner.svg" alt="learning/runtime — Self-learning is a superpower." width="100%" />
+</p>
 
 # Learning Runtime — MCP Server (v1.0)
 
