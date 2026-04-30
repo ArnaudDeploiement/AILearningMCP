@@ -198,25 +198,105 @@ main.go              HTTP server, MCP handler, OAuth, scheduler startup
 
 ### Setup workflow
 
-1. **Build and start the server**
+The setup has two phases: **deploy the server**, then **connect a client**.
+
+---
+
+#### 1. Deploy the server
+
+**1.1 — Build and start**
 
 ```bash
 # Required
 export JWT_SECRET="your-secret-key"
 
 # Optional
-export PORT=3000              # default: 3000
-export DB_PATH=./data/runtime.db  # default: ./data/runtime.db
-export BASE_URL=http://localhost:3000
-export LOG_LEVEL=debug        # debug | info | warn | error
+export PORT=3000                       # default: 3000
+export DB_PATH=./data/runtime.db       # default: ./data/runtime.db
+export BASE_URL=https://your.domain    # public origin, no trailing slash
+export LOG_LEVEL=debug                 # debug | info | warn | error
 
 go build -o learning-runtime && ./learning-runtime
 ```
 
+For real use, put the runtime behind a public reverse proxy with TLS — see [Server Configuration](#server-configuration).
 
-2. **Register / log in** — open `http://localhost:3000/authorize` in a browser. The page shows a login form; click **"Create one"** to toggle to the registration form (email + password). Existing users log in directly. This issues a JWT that Claude Code exchanges automatically on each session.
+**1.2 — Create your learner account**
 
-3. **Wire Claude Code** — add a `.mcp.json` in your project root (or `~/.claude/mcp.json` for global use):
+Open `$BASE_URL/authorize` in a browser. The page shows a login form; click **"Create one"** to toggle to the registration form (email + password). This is the account every MCP client will authenticate against via OAuth 2.1 + PKCE — no client ID or secret to copy by hand (the runtime supports dynamic client registration).
+
+**1.3 — Verify**
+
+```bash
+curl $BASE_URL/health   # → {"status":"ok"}
+```
+
+---
+
+#### 2. Connect a client
+
+The runtime exposes a single MCP endpoint: `$BASE_URL/mcp`. Add it as a custom connector in any MCP-compatible client.
+
+**Prerequisite for web UIs.** Claude.ai, ChatGPT, Le Chat and Gemini reach your server from their own cloud, not from your browser — they require a publicly reachable HTTPS URL. `http://localhost` will not work. Put the runtime behind a public reverse proxy of your choice (Caddy, Nginx, Traefik, Cloudflare Tunnel, …) with a valid TLS certificate. The steps below assume `https://your.domain` as the public origin.
+
+CLI clients running on the same machine as the runtime can use `http://localhost:3000` directly — see the **Advanced — CLI clients** section below.
+
+##### Claude (claude.ai)
+
+Custom connectors are available on Pro, Max, Team and Enterprise plans (Free is limited to one connector).
+
+1. Open `claude.ai` → **Settings** (or **Customize**) → **Connectors**.
+2. Click the **+** button next to *Connectors*.
+3. Fill in:
+   - **Name**: `Learning Runtime`
+   - **Remote MCP server URL**: `https://your.domain/mcp`
+4. Click **Add**, then complete the OAuth login when Claude prompts you.
+
+Reference: [Anthropic — Get started with custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
+##### ChatGPT
+
+Custom MCP connectors require **Developer Mode** and are available on Plus, Pro, Team, Enterprise and Edu plans (not Free).
+
+1. Open `chatgpt.com` → profile picture → **Settings** → **Connectors**.
+2. Open **Advanced** at the bottom and toggle **Developer mode** on.
+3. Back in **Settings → Connectors**, click **Create** (or **Add new connector**).
+4. Fill in:
+   - **Name**: `Learning Runtime`
+   - **Description**: `Adaptive learning brain (BKT/FSRS/IRT/PFA/KST)`
+   - **MCP server URL**: `https://your.domain/mcp`
+5. Click **Create** and complete the OAuth login. Write actions still require manual confirmation in chat.
+
+Reference: [OpenAI — Developer mode and MCP apps in ChatGPT](https://help.openai.com/en/articles/12584461-developer-mode-apps-and-full-mcp-connectors-in-chatgpt-beta).
+
+##### Le Chat (Mistral)
+
+1. Open `chat.mistral.ai` → **Connectors**.
+2. Click **+ Add Connector** and switch to the **Custom MCP Connector** tab.
+3. Fill in:
+   - **Connector name**: `learning_runtime` (no spaces or special characters)
+   - **Server URL**: `https://your.domain/mcp`
+   - **Description** (optional)
+4. Click **Connect**. Le Chat auto-detects OAuth 2.1 with dynamic registration — complete the login when prompted.
+
+Reference: [Mistral — Configuring a Custom Connector](https://help.mistral.ai/en/articles/393572-configuring-a-custom-connector).
+
+##### Gemini
+
+As of April 2026, the consumer Gemini web app (`gemini.google.com`) does not yet expose a self-serve UI to add a custom MCP server. Two paths are available today:
+
+- **Gemini Enterprise** (Google Cloud Console) — register the runtime as a [custom MCP server data store](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server). The runtime uses the StreamableHTTP transport, which is the one Gemini Enterprise supports.
+- **Gemini CLI** — see [MCP servers with Gemini CLI](https://geminicli.com/docs/tools/mcp-server/).
+
+Watch Google's release notes for native consumer-app support.
+
+---
+
+### Advanced — CLI clients
+
+#### Claude Code
+
+Add a `.mcp.json` in your project root (or `~/.claude/mcp.json` for global use):
 
 ```json
 {
@@ -229,7 +309,7 @@ go build -o learning-runtime && ./learning-runtime
 }
 ```
 
-4. **Verify** — `curl http://localhost:3000/health` should return `{"status":"ok"}`.
+Claude Code runs on the same machine as the server, so `http://localhost:3000/mcp` works directly — no public HTTPS endpoint required. For a remote runtime, replace the URL with `https://your.domain/mcp`.
 
 ## Capacity & Sizing
 
