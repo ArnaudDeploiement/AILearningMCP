@@ -267,4 +267,10 @@ The figures below include a safety buffer (~50%) against the theoretical limits.
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).
+
+## Author
+
+**Arnaud Guiovanna**
+- Website: [aguiovanna.fr](https://www.aguiovanna.fr)
+- GitHub: [@ArnaudGuiovanna](https://github.com/ArnaudGuiovanna)
