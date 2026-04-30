@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -12,42 +12,14 @@ import (
 
 var jwtSecret []byte
 
-func InitJWTSecret() error {
-	secret := os.Getenv("JWT_SECRET")
-	if secret != "" {
-		jwtSecret = []byte(secret)
-		return nil
-	}
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return err
-	}
-	jwtSecret = b
-	secretPath := os.Getenv("DB_PATH")
-	if secretPath == "" {
-		secretPath = "."
-	}
-	encoded := base64.StdEncoding.EncodeToString(b)
-	return os.WriteFile(secretPath+".jwt_secret", []byte(encoded), 0600)
-}
-
 func LoadJWTSecret() error {
 	secret := os.Getenv("JWT_SECRET")
-	if secret != "" {
-		jwtSecret = []byte(secret)
-		return nil
+	if secret == "" {
+		log.Fatal("JWT_SECRET env var required")
 	}
-	secretPath := os.Getenv("DB_PATH")
-	if secretPath == "" {
-		secretPath = "."
-	}
-	data, err := os.ReadFile(secretPath + ".jwt_secret")
+	decoded, err := base64.StdEncoding.DecodeString(secret)
 	if err != nil {
-		return InitJWTSecret()
-	}
-	decoded, err := base64.StdEncoding.DecodeString(string(data))
-	if err != nil {
-		return InitJWTSecret()
+		return fmt.Errorf("JWT_SECRET must be base64-encoded: %w", err)
 	}
 	jwtSecret = decoded
 	return nil

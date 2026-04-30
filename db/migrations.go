@@ -41,6 +41,8 @@ func Migrate(db *sql.DB) error {
 		`ALTER TABLE interactions ADD COLUMN misconception_detail TEXT`,
 		`ALTER TABLE domains ADD COLUMN value_framings_json TEXT DEFAULT ''`,
 		`ALTER TABLE domains ADD COLUMN last_value_axis TEXT DEFAULT ''`,
+		`ALTER TABLE oauth_codes ADD COLUMN client_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE oauth_clients ADD COLUMN client_secret_hash TEXT DEFAULT ''`,
 	}
 	for _, m := range alterMigrations {
 		_, _ = db.Exec(m) // ignore "duplicate column" errors
@@ -52,14 +54,16 @@ func Migrate(db *sql.DB) error {
 			code           TEXT PRIMARY KEY,
 			learner_id     TEXT NOT NULL REFERENCES learners(id),
 			code_challenge TEXT NOT NULL,
+			client_id      TEXT NOT NULL DEFAULT '',
 			expires_at     DATETIME NOT NULL,
 			created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS oauth_clients (
-			client_id      TEXT PRIMARY KEY,
-			client_name    TEXT DEFAULT '',
-			redirect_uris  TEXT DEFAULT '[]',
-			created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+			client_id          TEXT PRIMARY KEY,
+			client_name        TEXT DEFAULT '',
+			redirect_uris      TEXT DEFAULT '[]',
+			client_secret_hash TEXT DEFAULT '',
+			created_at         DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_concept_states_learner ON concept_states(learner_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_concept_states_review ON concept_states(learner_id, next_review)`,

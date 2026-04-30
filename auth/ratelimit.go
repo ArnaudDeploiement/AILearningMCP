@@ -3,6 +3,8 @@ package auth
 import (
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -86,14 +88,29 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
+// clientIP returns the bucket key. Reads X-Forwarded-For only when
+// TRUST_PROXY_HEADERS=1 — otherwise a spoofed header would bypass per-IP limits.
+func clientIP(r *http.Request) string {
+	if os.Getenv("TRUST_PROXY_HEADERS") == "1" {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			first := strings.TrimSpace(strings.Split(xff, ",")[0])
+			if first != "" {
+				return first
+			}
+		}
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip == "" {
+		return r.RemoteAddr
+	}
+	return ip
+}
+
 // RateLimitMiddleware wraps an http.Handler with rate limiting.
 // Returns 429 Too Many Requests when the limit is exceeded.
 func RateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
+		ip := clientIP(r)
 		if !limiter.Allow(ip) {
 			w.Header().Set("Retry-After", "5")
 			http.Error(w, `{"error":"rate_limit_exceeded"}`, http.StatusTooManyRequests)

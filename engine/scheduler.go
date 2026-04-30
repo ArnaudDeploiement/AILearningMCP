@@ -59,6 +59,35 @@ func (s *Scheduler) Start() error {
 
 func (s *Scheduler) Stop() { s.cron.Stop() }
 
+// filterStatesByActiveConcepts keeps only states whose concept is in the set.
+// Empty set means "no domains" → return as-is so the caller can decide what to
+// do (a learner with no domains shouldn't get any alerts anyway).
+func filterStatesByActiveConcepts(states []*models.ConceptState, set map[string]bool) []*models.ConceptState {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]*models.ConceptState, 0, len(states))
+	for _, cs := range states {
+		if set[cs.Concept] {
+			out = append(out, cs)
+		}
+	}
+	return out
+}
+
+func filterInteractionsByActiveConcepts(interactions []*models.Interaction, set map[string]bool) []*models.Interaction {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]*models.Interaction, 0, len(interactions))
+	for _, i := range interactions {
+		if set[i.Concept] {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // ─── Critical Alerts (every 30min) ──────────────────────────────────────────
 
 func (s *Scheduler) checkCriticalAlerts() {
@@ -82,6 +111,14 @@ func (s *Scheduler) checkCriticalAlerts() {
 			continue
 		}
 		interactions, _ := s.store.GetRecentInteractionsByLearner(learner.ID, 20)
+
+		// Drop orphan concepts left behind by delete_domain so we don't
+		// page a user about a concept that no longer belongs to any of
+		// their domains.
+		activeConcepts, _ := s.store.ActiveDomainConceptSet(learner.ID)
+		states = filterStatesByActiveConcepts(states, activeConcepts)
+		interactions = filterInteractionsByActiveConcepts(interactions, activeConcepts)
+
 		alerts := ComputeAlerts(states, interactions, time.Time{})
 
 		for _, alert := range alerts {
@@ -422,6 +459,10 @@ func (s *Scheduler) sendWebhook(url, message string) error {
 // 4 attempts: immediate, +1s, +5s, +25s.
 // Stops on 4xx (except 429). Respects Discord Retry-After header on 429.
 func (s *Scheduler) doWithRetry(url string, body []byte) error {
+	if !db.IsSafeWebhookURL(url) {
+		s.logger.Error("webhook blocked: unsafe url", "url", url)
+		return fmt.Errorf("unsafe webhook url")
+	}
 	delays := []time.Duration{0, 1 * time.Second, 5 * time.Second, 25 * time.Second}
 	var lastErr error
 	for attempt, delay := range delays {

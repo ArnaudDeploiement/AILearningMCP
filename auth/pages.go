@@ -13,6 +13,7 @@ type authPageData struct {
 	CodeChallenge       string
 	CodeChallengeMethod string
 	Scope               string
+	CSRFToken           string
 }
 
 var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
@@ -155,6 +156,7 @@ var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
       <p class="subtitle">Sign in to continue.</p>
       <form method="POST" action="/authorize">
         <input type="hidden" name="mode" value="login" />
+        <input type="hidden" name="csrf_token"            value="{{.Data.CSRFToken}}" />
         <input type="hidden" name="client_id"             value="{{.Data.ClientID}}" />
         <input type="hidden" name="redirect_uri"          value="{{.Data.RedirectURI}}" />
         <input type="hidden" name="response_type"         value="{{.Data.ResponseType}}" />
@@ -179,6 +181,7 @@ var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
       <p class="subtitle">Create your account.</p>
       <form method="POST" action="/authorize">
         <input type="hidden" name="mode" value="register" />
+        <input type="hidden" name="csrf_token"            value="{{.Data.CSRFToken}}" />
         <input type="hidden" name="client_id"             value="{{.Data.ClientID}}" />
         <input type="hidden" name="redirect_uri"          value="{{.Data.RedirectURI}}" />
         <input type="hidden" name="response_type"         value="{{.Data.ResponseType}}" />

@@ -97,6 +97,11 @@ func registerRecordCalibrationResult(server *mcp.Server, deps *Deps) {
 			r, _ := errorResult(fmt.Sprintf("prediction not found: %v", err))
 			return r, nil, nil
 		}
+		if record.LearnerID != learnerID {
+			deps.Logger.Warn("record_calibration_result: learner mismatch", "prediction_id", params.PredictionID, "learner", learnerID, "owner", record.LearnerID)
+			r, _ := errorResult("calibration record not found")
+			return r, nil, nil
+		}
 
 		delta := record.Predicted - params.ActualScore
 

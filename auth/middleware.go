@@ -15,7 +15,6 @@ const LearnerIDKey contextKey = "learner_id"
 func BearerMiddleware(baseURL string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
-		slog.Info("auth middleware", "has_bearer", strings.HasPrefix(authHeader, "Bearer "), "token_len", len(authHeader))
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
 				`Bearer resource_metadata="%s/.well-known/oauth-protected-resource"`, baseURL,
@@ -25,8 +24,8 @@ func BearerMiddleware(baseURL string, next http.Handler) http.Handler {
 		}
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 		learnerID, err := VerifyJWT(tokenStr)
-		slog.Info("jwt verify", "learner_id", learnerID, "err", err)
 		if err != nil {
+			slog.Debug("jwt verify failed", "err", err)
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
 				`Bearer resource_metadata="%s/.well-known/oauth-protected-resource", error="invalid_token"`, baseURL,
 			))
