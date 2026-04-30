@@ -221,15 +221,13 @@ go build -o learning-runtime && ./learning-runtime
 
 For real use, put the runtime behind a public reverse proxy with TLS — see [Server Configuration](#server-configuration).
 
-**1.2 — Create your learner account**
-
-Open `$BASE_URL/authorize` in a browser. The page shows a login form; click **"Create one"** to toggle to the registration form (email + password). This is the account every MCP client will authenticate against via OAuth 2.1 + PKCE — no client ID or secret to copy by hand (the runtime supports dynamic client registration).
-
-**1.3 — Verify**
+**1.2 — Verify**
 
 ```bash
 curl $BASE_URL/health   # → {"status":"ok"}
 ```
+
+No manual user registration is needed at this stage. Accounts are created on demand during the first client connection (see below).
 
 ---
 
@@ -240,6 +238,8 @@ The runtime exposes a single MCP endpoint: `$BASE_URL/mcp`. Add it as a custom c
 **Prerequisite for web UIs.** Claude.ai, ChatGPT, Le Chat and Gemini reach your server from their own cloud, not from your browser — they require a publicly reachable HTTPS URL. `http://localhost` will not work. Put the runtime behind a public reverse proxy of your choice (Caddy, Nginx, Traefik, Cloudflare Tunnel, …) with a valid TLS certificate. The steps below assume `https://your.domain` as the public origin.
 
 CLI clients running on the same machine as the runtime can use `http://localhost:3000` directly — see the **Advanced — CLI clients** section below.
+
+**First-time login.** When a client connects for the first time, the runtime starts an OAuth 2.1 + PKCE flow with dynamic client registration (no client ID or secret to copy by hand). The client opens the runtime's `/authorize` page in a new tab — click **"Create one"** to register (email + password) on the very first connection, or log in if the account already exists. Subsequent launches reuse the issued tokens and re-authenticate silently.
 
 ##### Claude (claude.ai)
 
