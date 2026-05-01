@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 // AutonomyInput holds the data needed to compute autonomy metrics.

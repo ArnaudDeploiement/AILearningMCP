@@ -9,8 +9,8 @@ import (
 	"math"
 	"time"
 
-	"learning-runtime/algorithms"
-	"learning-runtime/models"
+	"tutor-mcp/algorithms"
+	"tutor-mcp/models"
 )
 
 func ComputeAlerts(states []*models.ConceptState, recentInteractions []*models.Interaction, sessionStart time.Time) []models.Alert {

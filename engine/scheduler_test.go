@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"learning-runtime/db"
+	"tutor-mcp/db"
 )
 
 func TestIsSafeWebhookURL(t *testing.T) {

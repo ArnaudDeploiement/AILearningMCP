@@ -7,8 +7,8 @@ package engine
 import (
 	"fmt"
 
-	"learning-runtime/algorithms"
-	"learning-runtime/models"
+	"tutor-mcp/algorithms"
+	"tutor-mcp/models"
 )
 
 // Route determines the next optimal activity.

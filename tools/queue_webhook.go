@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
