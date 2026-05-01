@@ -14,6 +14,63 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// Input caps for domain-management tools. These bound the cost of a single
+// MCP call and stop a misbehaving client from pushing arbitrarily large
+// strings or graphs into SQLite.
+const (
+	maxDomainNameLen        = 200
+	maxPersonalGoalLen      = 2000
+	maxConceptNameLen       = 200
+	maxConceptsPerCall      = 500
+	maxPrereqEntriesPerNode = 20
+	maxValueFramingLen      = 2000
+)
+
+// validateConcepts enforces the size caps on a concept list and its
+// prerequisite graph. Returns the first error found (one short message).
+func validateConcepts(concepts []string, prereqs map[string][]string) error {
+	if len(concepts) > maxConceptsPerCall {
+		return fmt.Errorf("too many concepts: %d (max %d)", len(concepts), maxConceptsPerCall)
+	}
+	for _, c := range concepts {
+		if c == "" {
+			return fmt.Errorf("empty concept name")
+		}
+		if len(c) > maxConceptNameLen {
+			return fmt.Errorf("concept name too long (max %d chars)", maxConceptNameLen)
+		}
+	}
+	if len(prereqs) > maxConceptsPerCall {
+		return fmt.Errorf("too many prerequisite entries: %d (max %d)", len(prereqs), maxConceptsPerCall)
+	}
+	for k, vs := range prereqs {
+		if len(k) > maxConceptNameLen {
+			return fmt.Errorf("prerequisite key too long (max %d chars)", maxConceptNameLen)
+		}
+		if len(vs) > maxPrereqEntriesPerNode {
+			return fmt.Errorf("too many prerequisites for %q (max %d)", k, maxPrereqEntriesPerNode)
+		}
+		for _, v := range vs {
+			if len(v) > maxConceptNameLen {
+				return fmt.Errorf("prerequisite value too long (max %d chars)", maxConceptNameLen)
+			}
+		}
+	}
+	return nil
+}
+
+func validateValueFramings(vf *ValueFramingsInput) error {
+	if vf == nil {
+		return nil
+	}
+	for _, f := range []string{vf.Financial, vf.Employment, vf.Intellectual, vf.Innovation} {
+		if len(f) > maxValueFramingLen {
+			return fmt.Errorf("value_framing too long (max %d chars)", maxValueFramingLen)
+		}
+	}
+	return nil
+}
+
 type ValueFramingsInput struct {
 	Financial    string `json:"financial,omitempty" jsonschema:"Gain financier (1-2 phrases)"`
 	Employment   string `json:"employment,omitempty" jsonschema:"Gain employabilite / carriere (1-2 phrases)"`
@@ -45,8 +102,24 @@ func registerInitDomain(server *mcp.Server, deps *Deps) {
 			r, _ := errorResult("name is required")
 			return r, nil, nil
 		}
+		if len(params.Name) > maxDomainNameLen {
+			r, _ := errorResult(fmt.Sprintf("name too long (max %d chars)", maxDomainNameLen))
+			return r, nil, nil
+		}
+		if len(params.PersonalGoal) > maxPersonalGoalLen {
+			r, _ := errorResult(fmt.Sprintf("personal_goal too long (max %d chars)", maxPersonalGoalLen))
+			return r, nil, nil
+		}
 		if len(params.Concepts) == 0 {
 			r, _ := errorResult("at least one concept is required")
+			return r, nil, nil
+		}
+		if err := validateConcepts(params.Concepts, params.Prerequisites); err != nil {
+			r, _ := errorResult(err.Error())
+			return r, nil, nil
+		}
+		if err := validateValueFramings(params.ValueFramings); err != nil {
+			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
 
@@ -119,6 +192,10 @@ func registerAddConcepts(server *mcp.Server, deps *Deps) {
 
 		if len(params.Concepts) == 0 {
 			r, _ := errorResult("at least one concept is required")
+			return r, nil, nil
+		}
+		if err := validateConcepts(params.Concepts, params.Prerequisites); err != nil {
+			r, _ := errorResult(err.Error())
 			return r, nil, nil
 		}
 
