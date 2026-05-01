@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"learning-runtime/db"
+	"tutor-mcp/db"
 )
 
 // OAuthServer implements the OAuth 2.1 authorization server.

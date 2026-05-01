@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	"learning-runtime/db"
+	"tutor-mcp/db"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

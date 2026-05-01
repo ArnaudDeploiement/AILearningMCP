@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"learning-runtime/engine"
+	"tutor-mcp/engine"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

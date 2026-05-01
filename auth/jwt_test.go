@@ -68,7 +68,7 @@ func TestVerifyJWT_RejectsMissingAudience(t *testing.T) {
 func TestVerifyJWT_RejectsAlgNone(t *testing.T) {
 	// alg=none token, hand-crafted: header.payload.
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
-	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"x","iss":"https://issuer.example","aud":"learning-runtime/mcp","exp":99999999999}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"x","iss":"https://issuer.example","aud":"tutor-mcp/mcp","exp":99999999999}`))
 	tok := header + "." + payload + "."
 
 	setTestSecret(t)

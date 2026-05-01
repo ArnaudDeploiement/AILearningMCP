@@ -37,7 +37,7 @@ var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Learning Runtime</title>
+  <title>Tutor MCP</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

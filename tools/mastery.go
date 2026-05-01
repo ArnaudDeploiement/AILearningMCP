@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	"learning-runtime/algorithms"
+	"tutor-mcp/algorithms"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

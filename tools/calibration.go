@@ -10,7 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

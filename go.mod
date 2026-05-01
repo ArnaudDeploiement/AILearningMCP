@@ -1,4 +1,4 @@
-module learning-runtime
+module tutor-mcp
 
 go 1.25.6
 
