@@ -2,7 +2,7 @@
   <img src="docs/banner.svg" alt="tutor/mcp — Self-learning is a superpower." width="100%" />
 </p>
 
-# Tutor MCP — Server (v1.0)
+# Tutor MCP — Server (v0.2)
 
 **Tutor MCP is the adaptive brain behind a personalised tutor.** You tell an LLM (Claude, ChatGPT, …) what you want to learn — *Spanish for travel*, *Go for backend*, *options trading*, *medieval history* — and the runtime orchestrates the journey end-to-end: what to study next, when to review, how hard the next exercise should be, when you've mastered a concept, when you're losing motivation, when you're ready to be more autonomous. It works on **any subject the learner can describe in natural language** — no content catalog, no curation, no editorial backlog.
 

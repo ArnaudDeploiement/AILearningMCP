@@ -125,10 +125,10 @@
   <!-- FOOTER RIGHT: pills -->
   <g transform="translate(1192 580)">
     <!-- pills are right-aligned, so we'll position from right -->
-    <!-- MCP · v1.0 (accent, with border) -->
+    <!-- MCP · v0.2 (accent, with border) -->
     <g transform="translate(-110 -22)">
       <rect x="0" y="0" width="110" height="30" fill="none" stroke="#e8804a" stroke-opacity="0.55" stroke-width="1"/>
-      <text x="55" y="20" class="mono" font-size="12" letter-spacing="0.72" text-anchor="middle" fill="#f3a875">MCP · v1.0</text>
+      <text x="55" y="20" class="mono" font-size="12" letter-spacing="0.72" text-anchor="middle" fill="#f3a875">MCP · v0.2</text>
     </g>
     <!-- SQLite -->
     <g transform="translate(-186 -22)">
