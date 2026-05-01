@@ -29,15 +29,22 @@ func LoadJWTSecret() error {
 	return nil
 }
 
+// JWTAudience is the resource identifier embedded in the aud claim and
+// required by VerifyJWT. Keeping it stable (independent of BASE_URL) means
+// tokens stay valid if the public hostname changes.
+const JWTAudience = "learning-runtime/mcp"
+
 type Claims struct {
 	jwt.RegisteredClaims
 	Scope string `json:"scope"`
 }
 
-func GenerateJWT(learnerID string) (string, error) {
+func GenerateJWT(issuer, learnerID string) (string, error) {
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   learnerID,
+			Issuer:    issuer,
+			Audience:  jwt.ClaimStrings{JWTAudience},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -47,13 +54,17 @@ func GenerateJWT(learnerID string) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-func VerifyJWT(tokenString string) (string, error) {
+func VerifyJWT(tokenString, expectedIssuer string) (string, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("invalid token")
 		}
 		return jwtSecret, nil
-	})
+	},
+		jwt.WithIssuer(expectedIssuer),
+		jwt.WithAudience(JWTAudience),
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
 	if err != nil {
 		return "", fmt.Errorf("invalid token: %w", err)
 	}

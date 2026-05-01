@@ -387,7 +387,7 @@ func (s *OAuthServer) handleAuthorizationCodeGrant(w http.ResponseWriter, r *htt
 		return
 	}
 
-	accessToken, err := GenerateJWT(authCode.LearnerID)
+	accessToken, err := GenerateJWT(s.baseURL, authCode.LearnerID)
 	if err != nil {
 		s.logger.Error("generate jwt failed", "err", err)
 		writeTokenError(w, "server_error", http.StatusInternalServerError)
@@ -439,7 +439,7 @@ func (s *OAuthServer) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	accessToken, err := GenerateJWT(rt.LearnerID)
+	accessToken, err := GenerateJWT(s.baseURL, rt.LearnerID)
 	if err != nil {
 		s.logger.Error("generate jwt failed", "err", err)
 		writeTokenError(w, "server_error", http.StatusInternalServerError)
