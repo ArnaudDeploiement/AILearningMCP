@@ -10,9 +10,9 @@ import (
 	"math"
 	"time"
 
-	"learning-runtime/algorithms"
-	"learning-runtime/engine"
-	"learning-runtime/models"
+	"tutor-mcp/algorithms"
+	"tutor-mcp/engine"
+	"tutor-mcp/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

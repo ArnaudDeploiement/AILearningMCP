@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"learning-runtime/engine"
-	"learning-runtime/models"
+	"tutor-mcp/engine"
+	"tutor-mcp/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

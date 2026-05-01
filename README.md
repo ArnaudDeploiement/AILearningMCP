@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="docs/banner.svg" alt="learning/runtime — Self-learning is a superpower." width="100%" />
+  <img src="docs/banner.svg" alt="tutor/mcp — Self-learning is a superpower." width="100%" />
 </p>
 
-# Learning Runtime — MCP Server (v1.0)
+# Tutor MCP — Server (v1.0)
 
-**Learning Runtime is the adaptive brain behind a personalised tutor.** You tell an LLM (Claude, ChatGPT, …) what you want to learn — *Spanish for travel*, *Go for backend*, *options trading*, *medieval history* — and the runtime orchestrates the journey end-to-end: what to study next, when to review, how hard the next exercise should be, when you've mastered a concept, when you're losing motivation, when you're ready to be more autonomous. It works on **any subject the learner can describe in natural language** — no content catalog, no curation, no editorial backlog.
+**Tutor MCP is the adaptive brain behind a personalised tutor.** You tell an LLM (Claude, ChatGPT, …) what you want to learn — *Spanish for travel*, *Go for backend*, *options trading*, *medieval history* — and the runtime orchestrates the journey end-to-end: what to study next, when to review, how hard the next exercise should be, when you've mastered a concept, when you're losing motivation, when you're ready to be more autonomous. It works on **any subject the learner can describe in natural language** — no content catalog, no curation, no editorial backlog.
 
 Concretely, it provides real-time cognitive state tracking, spaced-repetition scheduling, intelligent activity routing, misconception diagnosis, a motivation layer, and a metacognitive loop that helps learners become autonomous — all exposed as a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that any MCP-compatible LLM can drive.
 
 ## Compatible MCP clients
 
-Learning Runtime works out of the box with the main MCP-capable assistants — connect it to any of them via a custom connector (see [Setup workflow](#setup-workflow)).
+Tutor MCP works out of the box with the main MCP-capable assistants — connect it to any of them via a custom connector (see [Setup workflow](#setup-workflow)).
 
 <p align="left">
   <a href="#claude-claudeai"><img src="docs/assets/logos/claude.svg" width="40" height="40" alt="Claude" title="Claude" /></a>
@@ -24,7 +24,7 @@ Learning Runtime works out of the box with the main MCP-capable assistants — c
 
 ## Design Choice — The LLM is the Content Engine
 
-Traditional learning platforms (Duolingo, Anki, Khan Academy) are bounded by their item banks: once the catalog is exhausted, the system stops. Learning Runtime takes the opposite bet.
+Traditional learning platforms (Duolingo, Anki, Khan Academy) are bounded by their item banks: once the catalog is exhausted, the system stops. Tutor MCP takes the opposite bet.
 
 > The LLM is trained on humanity's knowledge. It is the most flexible content generator that has ever existed. The runtime never stores exercises — it generates them on demand, calibrated in real time to the learner's mastery, ability, affect, and personal goal.
 
@@ -234,7 +234,7 @@ export DB_PATH=./data/runtime.db       # default: ./data/runtime.db
 export BASE_URL=https://your.domain    # public origin, no trailing slash
 export LOG_LEVEL=debug                 # debug | info | warn | error
 
-go build -o learning-runtime && ./learning-runtime
+go build -o tutor-mcp && ./tutor-mcp
 ```
 
 For real use, put the runtime behind a public reverse proxy with TLS — see [Server Configuration](#server-configuration).
@@ -266,7 +266,7 @@ Custom connectors are available on Pro, Max, Team and Enterprise plans (Free is 
 1. Open `claude.ai` → **Settings** (or **Customize**) → **Connectors**.
 2. Click the **+** button next to *Connectors*.
 3. Fill in:
-   - **Name**: `Learning Runtime`
+   - **Name**: `Tutor MCP`
    - **Remote MCP server URL**: `https://your.domain/mcp`
 4. Click **Add**, then complete the OAuth login when Claude prompts you.
 
@@ -280,7 +280,7 @@ Custom MCP connectors require **Developer Mode** and are available on Plus, Pro,
 2. Open **Advanced** at the bottom and toggle **Developer mode** on.
 3. Back in **Settings → Connectors**, click **Create** (or **Add new connector**).
 4. Fill in:
-   - **Name**: `Learning Runtime`
+   - **Name**: `Tutor MCP`
    - **Description**: `Adaptive learning brain (BKT/FSRS/IRT/PFA/KST)`
    - **MCP server URL**: `https://your.domain/mcp`
 5. Click **Create** and complete the OAuth login. Write actions still require manual confirmation in chat.
@@ -292,7 +292,7 @@ Reference: [OpenAI — Developer mode and MCP apps in ChatGPT](https://help.open
 1. Open `chat.mistral.ai` → **Connectors**.
 2. Click **+ Add Connector** and switch to the **Custom MCP Connector** tab.
 3. Fill in:
-   - **Connector name**: `learning_runtime` (no spaces or special characters)
+   - **Connector name**: `tutor_mcp` (no spaces or special characters)
    - **Server URL**: `https://your.domain/mcp`
    - **Description** (optional)
 4. Click **Connect**. Le Chat auto-detects OAuth 2.1 with dynamic registration — complete the login when prompted.
@@ -319,7 +319,7 @@ Add a `.mcp.json` in your project root (or `~/.claude/mcp.json` for global use):
 ```json
 {
   "mcpServers": {
-    "learning-runtime": {
+    "tutor-mcp": {
       "type": "http",
       "url": "http://localhost:3000/mcp"
     }

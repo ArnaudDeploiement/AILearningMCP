@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 func TestRouteForgettingPriority(t *testing.T) {

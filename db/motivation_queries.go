@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	"learning-runtime/algorithms"
-	"learning-runtime/models"
+	"tutor-mcp/algorithms"
+	"tutor-mcp/models"
 )
 
 // ConceptMasteryDelta estimates per-concept mastery trajectory over a window.

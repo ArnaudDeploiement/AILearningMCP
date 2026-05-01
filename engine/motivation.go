@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"learning-runtime/algorithms"
-	"learning-runtime/db"
-	"learning-runtime/models"
+	"tutor-mcp/algorithms"
+	"tutor-mcp/db"
+	"tutor-mcp/models"
 )
 
 // BriefInput gathers the signals the motivation engine needs to decide which brief (if any) to fire.

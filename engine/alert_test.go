@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 func ptrTime(t time.Time) *time.Time { return &t }

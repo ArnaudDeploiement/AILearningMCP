@@ -32,7 +32,7 @@ func LoadJWTSecret() error {
 // JWTAudience is the resource identifier embedded in the aud claim and
 // required by VerifyJWT. Keeping it stable (independent of BASE_URL) means
 // tokens stay valid if the public hostname changes.
-const JWTAudience = "learning-runtime/mcp"
+const JWTAudience = "tutor-mcp/mcp"
 
 type Claims struct {
 	jwt.RegisteredClaims

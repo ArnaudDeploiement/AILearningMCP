@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="learning/runtime — Self-learning is a superpower. A Model Context Protocol server that turns your AI into a super-intelligent tutor.">
-  <title>learning/runtime — Self-learning is a superpower.</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-label="tutor/mcp — Self-learning is a superpower. A Model Context Protocol server that turns your AI into a super-intelligent tutor.">
+  <title>tutor/mcp — Self-learning is a superpower.</title>
   <defs>
     <style>
       .mono { font-family: ui-monospace, "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Menlo, Consolas, monospace; }
@@ -64,7 +64,7 @@
       <circle cx="50" cy="56" r="14" fill="none" stroke="#e8804a" stroke-opacity="0.22" stroke-width="1.2"/>
       <circle cx="50" cy="56" r="9" fill="url(#orb)"/>
     </g>
-    <text x="164" y="86" class="sans" font-size="56" font-weight="700" letter-spacing="-2.24" fill="#f5ede5">learning<tspan fill="#f5ede5" fill-opacity="0.55" font-weight="400">/</tspan>runtime</text>
+    <text x="164" y="86" class="sans" font-size="56" font-weight="700" letter-spacing="-2.24" fill="#f5ede5">tutor<tspan fill="#f5ede5" fill-opacity="0.55" font-weight="400">/</tspan>mcp</text>
   </g>
 
   <!-- TAGLINE -->

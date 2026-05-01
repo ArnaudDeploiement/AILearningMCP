@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 // InsertImplementationIntention persists a Gollwitzer-style if-then commitment
