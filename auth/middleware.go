@@ -27,7 +27,7 @@ func BearerMiddleware(baseURL string, next http.Handler) http.Handler {
 			return
 		}
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		learnerID, err := VerifyJWT(tokenStr)
+		learnerID, err := VerifyJWT(tokenStr, baseURL)
 		if err != nil {
 			slog.Debug("jwt verify failed", "err", err)
 			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
