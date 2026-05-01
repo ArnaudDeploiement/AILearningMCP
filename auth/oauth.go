@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -105,11 +104,20 @@ func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 	redirectURI := q.Get("redirect_uri")
 
 	if err := s.validateRedirectURI(clientID, redirectURI); err != nil {
-		http.Error(w, "invalid redirect_uri: "+err.Error(), http.StatusBadRequest)
+		s.logger.Debug("authorize GET: redirect_uri rejected", "err", err, "client_id", clientID)
+		http.Error(w, `{"error":"invalid_request"}`, http.StatusBadRequest)
 		return
 	}
 
-	s.logger.Info("authorize GET", "client_id", clientID, "state_len", len(q.Get("state")), "state_sample", truncate(q.Get("state"), 80))
+	codeChallenge := q.Get("code_challenge")
+	codeChallengeMethod := q.Get("code_challenge_method")
+	if err := s.requirePKCEForPublicClient(clientID, codeChallenge, codeChallengeMethod); err != nil {
+		s.logger.Debug("authorize GET: PKCE missing for public client", "err", err, "client_id", clientID)
+		http.Error(w, `{"error":"invalid_request"}`, http.StatusBadRequest)
+		return
+	}
+
+	s.logger.Info("authorize GET", "client_id", clientID, "state_len", len(q.Get("state")))
 
 	csrfToken, err := generateCSRFToken()
 	if err != nil {
@@ -120,7 +128,7 @@ func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 		Name:     "csrf_token",
 		Value:    csrfToken,
 		Path:     "/authorize",
-		MaxAge:   600,
+		MaxAge:   3600,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -131,12 +139,36 @@ func (s *OAuthServer) HandleAuthorizeGet(w http.ResponseWriter, r *http.Request)
 		RedirectURI:         redirectURI,
 		ResponseType:        q.Get("response_type"),
 		State:               q.Get("state"),
-		CodeChallenge:       q.Get("code_challenge"),
-		CodeChallengeMethod: q.Get("code_challenge_method"),
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
 		Scope:               q.Get("scope"),
 		CSRFToken:           csrfToken,
 	}
 	renderAuthPage(w, data, "", "login")
+}
+
+// requirePKCEForPublicClient enforces RFC 9700 §2.1.1: public clients
+// (no stored secret) MUST use PKCE with S256. Confidential clients are
+// still allowed to skip PKCE — they authenticate via client_secret.
+func (s *OAuthServer) requirePKCEForPublicClient(clientID, codeChallenge, method string) error {
+	if clientID == "" {
+		return fmt.Errorf("missing client_id")
+	}
+	client, err := s.store.GetOAuthClient(clientID)
+	if err != nil {
+		return fmt.Errorf("unknown client")
+	}
+	if client.ClientSecretHash != "" {
+		// Confidential client: PKCE optional.
+		return nil
+	}
+	if codeChallenge == "" {
+		return fmt.Errorf("code_challenge required for public clients")
+	}
+	if method != "S256" {
+		return fmt.Errorf("code_challenge_method must be S256")
+	}
+	return nil
 }
 
 func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +188,16 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 	clientID := r.FormValue("client_id")
 	redirectURI := r.FormValue("redirect_uri")
 	if err := s.validateRedirectURI(clientID, redirectURI); err != nil {
-		http.Error(w, "invalid redirect_uri: "+err.Error(), http.StatusBadRequest)
+		s.logger.Debug("authorize POST: redirect_uri rejected", "err", err, "client_id", clientID)
+		http.Error(w, `{"error":"invalid_request"}`, http.StatusBadRequest)
+		return
+	}
+
+	codeChallenge := r.FormValue("code_challenge")
+	codeChallengeMethod := r.FormValue("code_challenge_method")
+	if err := s.requirePKCEForPublicClient(clientID, codeChallenge, codeChallengeMethod); err != nil {
+		s.logger.Debug("authorize POST: PKCE missing for public client", "err", err, "client_id", clientID)
+		http.Error(w, `{"error":"invalid_request"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -165,7 +206,6 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 	password := r.FormValue("password")
 
 	state := r.FormValue("state")
-	codeChallenge := r.FormValue("code_challenge")
 
 	data := authPageData{
 		ClientID:            clientID,
@@ -173,7 +213,7 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 		ResponseType:        r.FormValue("response_type"),
 		State:               state,
 		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: r.FormValue("code_challenge_method"),
+		CodeChallengeMethod: codeChallengeMethod,
 		Scope:               r.FormValue("scope"),
 		CSRFToken:           formCSRF,
 	}
@@ -258,15 +298,8 @@ func (s *OAuthServer) HandleAuthorizePost(w http.ResponseWriter, r *http.Request
 	// RFC 9207 mix-up mitigation: clients (e.g. Mistral) may require iss in the callback.
 	qv.Set("iss", s.baseURL)
 	u.RawQuery = qv.Encode()
-	s.logger.Info("authorize POST redirect", "state_len", len(state), "state_sample", truncate(state, 80), "redirect_url", u.String())
+	s.logger.Info("authorize POST redirect", "state_len", len(state), "redirect_host", u.Host)
 	http.Redirect(w, r, u.String(), http.StatusFound)
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
 }
 
 // extractClientCredentials returns (client_id, client_secret) using HTTP Basic
@@ -281,6 +314,7 @@ func extractClientCredentials(r *http.Request) (string, string) {
 
 // verifyClientAuth enforces secret-based authentication for confidential clients.
 // Public clients (empty stored hash) pass through and rely on PKCE.
+// The stored hash is a bcrypt digest; CompareHashAndPassword is constant-time.
 func verifyClientAuth(client *db.OAuthClient, suppliedSecret string) error {
 	if client.ClientSecretHash == "" {
 		return nil
@@ -288,9 +322,7 @@ func verifyClientAuth(client *db.OAuthClient, suppliedSecret string) error {
 	if suppliedSecret == "" {
 		return fmt.Errorf("invalid_client")
 	}
-	sum := sha256.Sum256([]byte(suppliedSecret))
-	got := hex.EncodeToString(sum[:])
-	if subtle.ConstantTimeCompare([]byte(got), []byte(client.ClientSecretHash)) != 1 {
+	if err := bcrypt.CompareHashAndPassword([]byte(client.ClientSecretHash), []byte(suppliedSecret)); err != nil {
 		return fmt.Errorf("invalid_client")
 	}
 	return nil
@@ -349,14 +381,13 @@ func (s *OAuthServer) handleAuthorizationCodeGrant(w http.ResponseWriter, r *htt
 	// Verify PKCE: SHA256(code_verifier) == code_challenge (base64url, no padding).
 	h := sha256.Sum256([]byte(codeVerifier))
 	computed := base64.RawURLEncoding.EncodeToString(h[:])
-	s.logger.Debug("PKCE check", "match", computed == authCode.CodeChallenge)
-	if computed != authCode.CodeChallenge {
+	if subtle.ConstantTimeCompare([]byte(computed), []byte(authCode.CodeChallenge)) != 1 {
 		s.logger.Debug("token exchange: PKCE mismatch")
 		writeTokenError(w, "invalid_grant", http.StatusBadRequest)
 		return
 	}
 
-	accessToken, err := GenerateJWT(authCode.LearnerID)
+	accessToken, err := GenerateJWT(s.baseURL, authCode.LearnerID)
 	if err != nil {
 		s.logger.Error("generate jwt failed", "err", err)
 		writeTokenError(w, "server_error", http.StatusInternalServerError)
@@ -408,7 +439,7 @@ func (s *OAuthServer) handleRefreshTokenGrant(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	accessToken, err := GenerateJWT(rt.LearnerID)
+	accessToken, err := GenerateJWT(s.baseURL, rt.LearnerID)
 	if err != nil {
 		s.logger.Error("generate jwt failed", "err", err)
 		writeTokenError(w, "server_error", http.StatusInternalServerError)
@@ -565,8 +596,13 @@ func (s *OAuthServer) HandleRegister(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
 			return
 		}
-		sum := sha256.Sum256([]byte(clientSecret))
-		secretHash = hex.EncodeToString(sum[:])
+		hash, herr := bcrypt.GenerateFromPassword([]byte(clientSecret), bcrypt.DefaultCost)
+		if herr != nil {
+			s.logger.Error("bcrypt client secret failed", "err", herr)
+			http.Error(w, `{"error":"server_error"}`, http.StatusInternalServerError)
+			return
+		}
+		secretHash = string(hash)
 	}
 
 	if err := s.store.CreateOAuthClientWithSecret(clientID, clientName, string(redirectURIsJSON), secretHash); err != nil {

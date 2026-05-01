@@ -937,7 +937,7 @@ type AuthCode struct {
 
 // OAuthClient is a dynamically-registered OAuth client.
 // RedirectURIs holds the JSON array as persisted.
-// ClientSecretHash is hex-encoded SHA-256 of the secret; empty for public (PKCE-only) clients.
+// ClientSecretHash is a bcrypt digest of the secret; empty for public (PKCE-only) clients.
 type OAuthClient struct {
 	ClientID         string
 	ClientName       string

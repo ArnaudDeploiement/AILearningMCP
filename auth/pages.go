@@ -5,6 +5,9 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"html/template"
 	"net/http"
 )
@@ -18,6 +21,15 @@ type authPageData struct {
 	CodeChallengeMethod string
 	Scope               string
 	CSRFToken           string
+}
+
+// generateNonce returns a fresh base64 nonce for CSP script-src.
+func generateNonce() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(b), nil
 }
 
 var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
@@ -177,7 +189,7 @@ var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
 
         <button type="submit">Sign in</button>
       </form>
-      <p class="toggle">No account? <a onclick="toggleView()">Create one</a></p>
+      <p class="toggle">No account? <a href="#" class="toggle-link">Create one</a></p>
     </div>
 
     <!-- Register form -->
@@ -205,15 +217,21 @@ var authTmpl = template.Must(template.New("auth").Parse(`<!DOCTYPE html>
 
         <button type="submit">Create account</button>
       </form>
-      <p class="toggle">Already have an account? <a onclick="toggleView()">Sign in</a></p>
+      <p class="toggle">Already have an account? <a href="#" class="toggle-link">Sign in</a></p>
     </div>
   </div>
 
-  <script>
+  <script nonce="{{.Nonce}}">
     function toggleView() {
       document.getElementById('login-view').classList.toggle('hidden');
       document.getElementById('register-view').classList.toggle('hidden');
     }
+    document.querySelectorAll('.toggle-link').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggleView();
+      });
+    });
     {{if eq .Mode "register"}}toggleView();{{end}}
   </script>
 </body>
@@ -224,9 +242,22 @@ type tmplData struct {
 	Data   authPageData
 	ErrMsg string
 	Mode   string // "login" or "register"
+	Nonce  string
 }
 
 func renderAuthPage(w http.ResponseWriter, data authPageData, errMsg string, mode string) {
+	nonce, err := generateNonce()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// Strict CSP: only same-origin resources; inline scripts must carry our
+	// per-request nonce. style-src keeps 'unsafe-inline' for the page's
+	// inline <style> block — style injection is not credential-exfil-grade.
+	w.Header().Set("Content-Security-Policy", fmt.Sprintf(
+		"default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+		nonce,
+	))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if errMsg != "" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -234,7 +265,7 @@ func renderAuthPage(w http.ResponseWriter, data authPageData, errMsg string, mod
 	if mode == "" {
 		mode = "login"
 	}
-	if err := authTmpl.Execute(w, tmplData{Data: data, ErrMsg: errMsg, Mode: mode}); err != nil {
+	if err := authTmpl.Execute(w, tmplData{Data: data, ErrMsg: errMsg, Mode: mode, Nonce: nonce}); err != nil {
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}
 }
