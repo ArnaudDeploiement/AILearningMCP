@@ -5,6 +5,7 @@
 package auth
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -92,22 +93,74 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// clientIP returns the bucket key. Reads X-Forwarded-For only when
-// TRUST_PROXY_HEADERS=1 — otherwise a spoofed header would bypass per-IP limits.
+// trustedProxiesOnce parses TRUSTED_PROXY_CIDRS exactly once at first use.
+// XFF is honored only when the direct peer (r.RemoteAddr) falls inside one of
+// these CIDRs, preventing a client from spoofing its own bucket key.
+var (
+	trustedProxiesOnce sync.Once
+	trustedProxies     []*net.IPNet
+)
+
+func loadTrustedProxies() []*net.IPNet {
+	trustedProxiesOnce.Do(func() {
+		raw := os.Getenv("TRUSTED_PROXY_CIDRS")
+		if raw == "" {
+			return
+		}
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			_, cidr, err := net.ParseCIDR(part)
+			if err != nil {
+				slog.Warn("invalid TRUSTED_PROXY_CIDRS entry", "value", part, "err", err)
+				continue
+			}
+			trustedProxies = append(trustedProxies, cidr)
+		}
+	})
+	return trustedProxies
+}
+
+func remoteIP(r *http.Request) net.IP {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	return net.ParseIP(host)
+}
+
+func isTrustedProxy(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	for _, cidr := range loadTrustedProxies() {
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// clientIP returns the bucket key. X-Forwarded-For is honored only when the
+// direct peer is in TRUSTED_PROXY_CIDRS; otherwise a client could spoof its
+// own bucket and bypass the per-IP limit. The leftmost XFF entry must be a
+// well-formed IP — invalid values fall back to the direct peer address.
 func clientIP(r *http.Request) string {
-	if os.Getenv("TRUST_PROXY_HEADERS") == "1" {
+	peer := remoteIP(r)
+	if isTrustedProxy(peer) {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			first := strings.TrimSpace(strings.Split(xff, ",")[0])
-			if first != "" {
-				return first
+			if parsed := net.ParseIP(first); parsed != nil {
+				return parsed.String() // canonical form (normalizes IPv6)
 			}
 		}
 	}
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if ip == "" {
-		return r.RemoteAddr
+	if peer != nil {
+		return peer.String()
 	}
-	return ip
+	return r.RemoteAddr
 }
 
 // RateLimitMiddleware wraps an http.Handler with rate limiting.
