@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	"learning-runtime/auth"
-	"learning-runtime/db"
-	"learning-runtime/engine"
-	"learning-runtime/tools"
+	"tutor-mcp/auth"
+	"tutor-mcp/db"
+	"tutor-mcp/engine"
+	"tutor-mcp/tools"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -62,7 +62,7 @@ func main() {
 
 	// Create MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
-		Name:    "learning-runtime",
+		Name:    "tutor-mcp",
 		Version: "1.0.0",
 	}, nil)
 
@@ -154,7 +154,7 @@ func main() {
 		shutdownErr <- server.Shutdown(ctx)
 	}()
 
-	logger.Info("learning runtime starting", "port", port, "base_url", baseURL)
+	logger.Info("tutor mcp starting", "port", port, "base_url", baseURL)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server failed", "err", err)
 		os.Exit(1)

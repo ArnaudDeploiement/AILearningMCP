@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"learning-runtime/db"
-	"learning-runtime/models"
+	"tutor-mcp/db"
+	"tutor-mcp/models"
 
 	"github.com/robfig/cron/v3"
 )

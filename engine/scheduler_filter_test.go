@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 // TestSchedulerFilters_DropOrphanConcepts protects against the cosmos-reported

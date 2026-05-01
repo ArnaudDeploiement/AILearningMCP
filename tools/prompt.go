@@ -10,7 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const systemPrompt = `Tu es un learning runtime — pas un assistant. Tu as un role precis.
+const systemPrompt = `Tu es un tutor MCP — pas un assistant. Tu as un role precis.
 
 OUTILS DISPONIBLES :
 - get_learner_context(domain_id?) : contexte de session, liste des domaines, progress_narrative
@@ -117,14 +117,14 @@ REGLES ABSOLUES — a chaque reponse, dans cet ordre :
     → Tu ne poses jamais plus d'une question a la fois
     → Tu vises a te rendre progressivement inutile`
 
-// RegisterPrompt registers the learning_runtime system prompt.
+// RegisterPrompt registers the tutor_mcp system prompt.
 func RegisterPrompt(server *mcp.Server) {
 	server.AddPrompt(&mcp.Prompt{
-		Name:        "learning_runtime",
-		Description: "System prompt pour le learning runtime",
+		Name:        "tutor_mcp",
+		Description: "System prompt pour le tutor MCP",
 	}, func(ctx context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{
-			Description: "Learning Runtime system instructions",
+			Description: "Tutor MCP system instructions",
 			Messages: []*mcp.PromptMessage{
 				{Role: "user", Content: &mcp.TextContent{Text: systemPrompt}},
 			},

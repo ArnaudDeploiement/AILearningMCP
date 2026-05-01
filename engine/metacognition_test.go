@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 func TestComputeAutonomyMetrics(t *testing.T) {

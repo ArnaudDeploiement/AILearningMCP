@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"learning-runtime/auth"
-	"learning-runtime/db"
-	"learning-runtime/models"
+	"tutor-mcp/auth"
+	"tutor-mcp/db"
+	"tutor-mcp/models"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

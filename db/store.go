@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 // IsSafeWebhookURL validates that a webhook URL targets Discord over HTTPS.

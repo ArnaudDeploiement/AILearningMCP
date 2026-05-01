@@ -3,7 +3,7 @@ package db
 import (
 	"testing"
 
-	"learning-runtime/models"
+	"tutor-mcp/models"
 )
 
 // TestActiveDomainConceptSet_FiltersOutDeletedDomain reproduces the orphan-concept
