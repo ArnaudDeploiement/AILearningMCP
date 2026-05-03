@@ -63,7 +63,7 @@ type domainCockpit struct {
 func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_cockpit_state",
-		Description: "Genere l'etat complet du cockpit: progression par concept, alertes, signaux, prochaine action. Sans domain_id, affiche tous les domaines.",
+		Description: "Retourne l'etat brut du cockpit en JSON (progression par concept, alertes, signaux, prochaine action). USAGE PROGRAMMATIQUE — scripts d'eval, reporting. NE PAS UTILISER quand l'apprenant demande d'ouvrir/voir/afficher son cockpit : utiliser open_cockpit qui rend une UI native.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetCockpitStateParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
@@ -296,7 +296,7 @@ type OpenCockpitParams struct {
 func registerOpenCockpit(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "open_cockpit",
-		Description: "Ouvre le cockpit d'apprentissage de l'apprenant — carte cognitive interactive avec graphe KST, focus du moment, signaux métacognitifs et progression vers le goal. Rendu nativement par les clients qui supportent MCP Apps (Claude Desktop, claude.ai) ; sinon, retourne un résumé texte.",
+		Description: "OUTIL À UTILISER quand l'apprenant demande d'ouvrir/voir/afficher/montrer son cockpit. Rend une UI MCP App native dans la conversation (Claude Desktop, claude.ai) — carte cognitive interactive avec graphe KST, focus du moment, signaux métacognitifs, progression vers le goal. NE PAS reformuler le résultat en texte : la UI s'affiche d'elle-même via _meta.ui.resourceUri. Pour les clients sans MCP Apps, le tool retourne aussi un résumé texte de fallback.",
 		Meta: cockpitUIMeta(),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params OpenCockpitParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
