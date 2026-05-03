@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"tutor-mcp/models"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestGetCockpitState_NoAuth(t *testing.T) {
@@ -96,5 +98,47 @@ func TestGetCockpitState_UnknownDomainID(t *testing.T) {
 	})
 	if !res.IsError || !strings.Contains(resultText(res), "domain not found") {
 		t.Fatalf("got %q", resultText(res))
+	}
+}
+
+func TestCockpitResource_Registered(t *testing.T) {
+	_, deps := setupToolsTest(t)
+	srv := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerCockpitResource(srv, deps)
+
+	c, s := mcp.NewInMemoryTransports()
+	go srv.Run(t.Context(), s)
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0"}, nil)
+	cs, err := client.Connect(t.Context(), c, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer cs.Close()
+
+	res, err := cs.ReadResource(t.Context(), &mcp.ReadResourceParams{URI: "ui://cockpit"})
+	if err != nil {
+		t.Fatalf("ReadResource ui://cockpit: %v", err)
+	}
+	if len(res.Contents) == 0 {
+		t.Fatal("no contents returned")
+	}
+	body := res.Contents[0].Text
+	if !strings.Contains(body, "<html") && !strings.Contains(body, "<!DOCTYPE") {
+		preview := body
+		if len(preview) > 200 {
+			preview = preview[:200]
+		}
+		t.Errorf("expected HTML content, got: %q", preview)
+	}
+	wantMIME := []string{"text/html", "text/html;profile=mcp-app"}
+	matched := false
+	for _, m := range wantMIME {
+		if res.Contents[0].MIMEType == m {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		t.Errorf("MIMEType=%q, want one of %v", res.Contents[0].MIMEType, wantMIME)
 	}
 }

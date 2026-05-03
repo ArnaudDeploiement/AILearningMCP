@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"tutor-mcp/algorithms"
+	"tutor-mcp/assets"
 	"tutor-mcp/engine"
 	"tutor-mcp/models"
 
@@ -267,5 +268,30 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			"dependency_trend": dependencyTrend,
 		})
 		return r, nil, nil
+	})
+}
+
+// registerCockpitResource serves the cockpit HTML at ui://cockpit. The HTML
+// is embedded via assets.FS — see assets/embed.go.
+func registerCockpitResource(server *mcp.Server, deps *Deps) {
+	server.AddResource(&mcp.Resource{
+		URI:         "ui://cockpit",
+		Name:        "cockpit",
+		Title:       "Cockpit d'apprentissage",
+		Description: "Interface MCP App rendue par le client (Claude Desktop, claude.ai). Carte cognitive interactive de l'apprenant pour la session courante et le modèle global.",
+		MIMEType:    "text/html;profile=mcp-app",
+	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+		body, err := assets.FS.ReadFile("cockpit.html")
+		if err != nil {
+			deps.Logger.Error("cockpit resource: read embedded html", "err", err)
+			return nil, err
+		}
+		return &mcp.ReadResourceResult{
+			Contents: []*mcp.ResourceContents{{
+				URI:      "ui://cockpit",
+				MIMEType: "text/html;profile=mcp-app",
+				Text:     string(body),
+			}},
+		}, nil
 	})
 }

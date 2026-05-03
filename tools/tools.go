@@ -99,6 +99,7 @@ func RegisterTools(server *mcp.Server, deps *Deps) {
 	registerCheckMastery(server, deps)
 	registerGetLearnerContext(server, deps)
 	registerGetAvailabilityModel(server, deps)
+	registerCockpitResource(server, deps)
 	registerGetCockpitState(server, deps)
 	registerInitDomain(server, deps)
 	registerAddConcepts(server, deps)
