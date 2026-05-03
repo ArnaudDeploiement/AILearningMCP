@@ -80,7 +80,8 @@ func resolveDomain(store *db.Store, learnerID, domainID string) (*models.Domain,
 func jsonResult(v interface{}) (*mcp.CallToolResult, error) {
 	data, _ := json.MarshalIndent(v, "", "  ")
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		Content:           []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		StructuredContent: v,
 	}, nil
 }
 
