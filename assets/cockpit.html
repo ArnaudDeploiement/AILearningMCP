@@ -536,9 +536,11 @@ html, body {
   (async () => {
     try {
       const init = await request('ui/initialize', {
+        protocolVersion: '2026-01-26',
+        appInfo: { name: 'tutor-mcp-cockpit', version: '2.0.0' },
         appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
       });
-      state.hostCaps = init || {};
+      state.hostCaps = (init && init.hostContext) || init || {};
       applyHostContext();
       send('ui/notifications/initialized', {});
       notifySize();
