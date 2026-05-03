@@ -275,8 +275,27 @@
 (function() {
   let snap = null;
 
-  function dispatch(method, params) {
-    window.parent.postMessage({ jsonrpc: "2.0", id: Date.now(), method: method, params: params }, "*");
+  // MCP Apps host messaging: we use TWO patterns.
+  //
+  //   send(method, params)    — JSON-RPC notification (no id, no response).
+  //   request(method, params) — JSON-RPC request with id; returns a Promise
+  //                             resolved with the host's response result.
+  //
+  // The handshake (ui/initialize) and Tab 2's tools/call need request().
+  // Notifications like ui/notifications/initialized use send().
+  let nextId = 1;
+  const pendingRequests = new Map(); // id -> resolve fn
+
+  function send(method, params) {
+    window.parent.postMessage({ jsonrpc: "2.0", method: method, params: params }, "*");
+  }
+
+  function request(method, params) {
+    const id = nextId++;
+    return new Promise((resolve) => {
+      pendingRequests.set(id, resolve);
+      window.parent.postMessage({ jsonrpc: "2.0", id: id, method: method, params: params }, "*");
+    });
   }
 
   function clearChildren(el) {
@@ -294,6 +313,20 @@
     return el;
   }
 
+  // routeStructured: dispatch a CallToolResult.structuredContent to the right
+  // panel based on its shape. Tab 1 (OLMGraph) has concepts+edges; Tab 2
+  // (GlobalOLMSnapshot) has domains+calibration_history.
+  function routeStructured(sc) {
+    if (!sc) return;
+    if (sc.concepts && sc.edges !== undefined) {
+      snap = sc;
+      render();
+    } else if (sc.domains && sc.calibration_history !== undefined) {
+      globalData = sc;
+      renderGlobal();
+    }
+  }
+
   // We do not check ev.origin here. The iframe is sandboxed by Claude Desktop /
   // claude.ai with no stable parent origin, and all rendered content goes through
   // safe DOM methods (textContent + createElement). A malicious page postMessaging
@@ -301,14 +334,32 @@
   // not XSS. Logical integrity is the parent client's responsibility.
   window.addEventListener('message', (ev) => {
     const m = ev.data;
-    if (!(m && m.params && m.params.structuredContent)) return;
-    const sc = m.params.structuredContent;
-    if (sc.concepts && sc.edges !== undefined) {
-      snap = sc;
-      render();
-    } else if (sc.domains && sc.calibration_history !== undefined) {
-      globalData = sc;
-      renderGlobal();
+    if (!m || m.jsonrpc !== "2.0") return;
+
+    // (a) JSON-RPC response to one of our outbound requests (ui/initialize,
+    // tools/call, …): match by id. The CallToolResult lives in m.result;
+    // its structuredContent — when present — feeds the panels.
+    if (m.id !== undefined && pendingRequests.has(m.id)) {
+      const resolve = pendingRequests.get(m.id);
+      pendingRequests.delete(m.id);
+      resolve(m.result);
+      if (m.result && m.result.structuredContent) {
+        routeStructured(m.result.structuredContent);
+      }
+      return;
+    }
+
+    // (b) Notification from host (no id). The initial open_cockpit
+    // CallToolResult arrives via ui/notifications/tool-result; m.params
+    // IS the CallToolResult.
+    if (m.method === "ui/notifications/tool-result" && m.params) {
+      routeStructured(m.params.structuredContent);
+      return;
+    }
+
+    if (m.method === "ui/notifications/tool-input") {
+      // Tool input args — we render against tool-result, not input. No-op.
+      return;
     }
   });
 
@@ -470,7 +521,16 @@
       else p.setAttribute("hidden", "");
     });
     if (name === "global" && !globalData) {
-      dispatch("tools/call", { name: "get_olm_snapshot", arguments: { scope: "global" } });
+      // Response is also intercepted by the message listener (which routes
+      // result.structuredContent through routeStructured), but we still
+      // resolve the Promise here for symmetry / future error handling.
+      request("tools/call", { name: "get_olm_snapshot", arguments: { scope: "global" } })
+        .then((result) => {
+          if (result && result.structuredContent) {
+            globalData = result.structuredContent;
+            renderGlobal();
+          }
+        });
     }
   }
 
@@ -615,10 +675,23 @@
   const cta = document.querySelector("#cta-attack");
   if (cta) cta.addEventListener("click", () => {
     if (!snap) return;
-    dispatch("tools/call", {
+    request("tools/call", {
       name: "learning_negotiation",
       arguments: { focus: snap.focus_concept, domain_id: snap.domain_id }
     });
+  });
+
+  // MCP Apps handshake — View → Host: ui/initialize, then ui/notifications/initialized.
+  // Per spec (modelcontextprotocol/ext-apps 2026-01-26), the host MUST NOT push
+  // ui/notifications/tool-input or ui/notifications/tool-result before it
+  // receives the `initialized` notification. Without this handshake, the
+  // iframe renders empty in Claude Desktop / claude.ai.
+  request("ui/initialize", {
+    appCapabilities: {
+      availableDisplayModes: ["inline"]
+    }
+  }).then(() => {
+    send("ui/notifications/initialized", {});
   });
 })();
 </script>

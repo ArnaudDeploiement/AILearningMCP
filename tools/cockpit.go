@@ -28,7 +28,10 @@ const cockpitResourceURI = "ui://cockpit"
 // resource to fetch after calling).
 func cockpitUIMeta() mcp.Meta {
 	return mcp.Meta{
-		"ui": map[string]any{"resourceUri": cockpitResourceURI},
+		"ui": map[string]any{
+			"resourceUri": cockpitResourceURI,
+			"visibility":  []string{"model", "app"},
+		},
 	}
 }
 

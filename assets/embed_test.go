@@ -35,6 +35,9 @@ func TestEmbeddedCockpitHTML_HasV4Markers(t *testing.T) {
 		"role=\"tablist\"",                  // ARIA
 		"id=\"olm-graph\"",                  // SVG container the JS targets
 		"window.addEventListener('message'", // postMessage handler
+		"ui/initialize",                     // MCP Apps handshake: View → Host request
+		"ui/notifications/initialized",      // MCP Apps handshake: View → Host notification
+		"ui/notifications/tool-result",      // MCP Apps inbound: Host → View tool result
 	}
 	for _, m := range mustContain {
 		if !strings.Contains(body, m) {
