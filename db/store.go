@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -1100,4 +1101,74 @@ func (s *Store) GetActivityStreak(learnerID string) (int, error) {
 		streak++
 	}
 	return streak, nil
+}
+
+// RawLearnerEvent is the DB-layer shape of a timeline event. Engine layer
+// converts to engine.LearnerEvent (same fields, different package).
+type RawLearnerEvent struct {
+	At      time.Time
+	Kind    string
+	Message string
+	Concept string
+}
+
+// GetRecentLearnerEvents returns a chronological-DESC list of cognitive events
+// since `since`, used by the cockpit "Modèle global" timeline. Events are
+// derived from existing tables — no new persistence:
+//
+//   - mastery_threshold : concept_state.p_mastery >= 0.70 and updated_at >= since
+//   - retention_drop    : p_mastery < 0.30 (proxy for fragile transition) and updated_at >= since
+//   - streak_start      : earliest interaction in a still-running streak (computed via GetActivityStreak)
+//
+// (calibration_threshold derivable from calibration_history but skipped in v1
+// to keep the query simple — covered by the calibration sparkline.)
+func (s *Store) GetRecentLearnerEvents(learnerID string, since time.Time) ([]RawLearnerEvent, error) {
+	var events []RawLearnerEvent
+
+	rows, err := s.db.Query(
+		`SELECT concept, p_mastery, updated_at
+		 FROM concept_states
+		 WHERE learner_id = ? AND updated_at >= ?
+		 ORDER BY updated_at DESC`,
+		learnerID, since,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get learner events: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var concept string
+		var mastery float64
+		var at time.Time
+		if err := rows.Scan(&concept, &mastery, &at); err != nil {
+			return nil, fmt.Errorf("scan event: %w", err)
+		}
+		if mastery >= 0.70 {
+			events = append(events, RawLearnerEvent{
+				At: at, Kind: "mastery_threshold", Concept: concept,
+				Message: fmt.Sprintf("%s atteint le seuil de maîtrise", concept),
+			})
+		} else if mastery < 0.30 {
+			events = append(events, RawLearnerEvent{
+				At: at, Kind: "retention_drop", Concept: concept,
+				Message: fmt.Sprintf("%s passe en fragile", concept),
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("get learner events rows: %w", err)
+	}
+
+	if streak, _ := s.GetActivityStreak(learnerID); streak > 0 {
+		startedAt := time.Now().UTC().AddDate(0, 0, -streak+1).Truncate(24 * time.Hour)
+		if !startedAt.Before(since) {
+			events = append(events, RawLearnerEvent{
+				At: startedAt, Kind: "streak_start",
+				Message: fmt.Sprintf("Démarrage de la série de %d jours", streak),
+			})
+		}
+	}
+
+	sort.Slice(events, func(i, j int) bool { return events[i].At.After(events[j].At) })
+	return events, nil
 }

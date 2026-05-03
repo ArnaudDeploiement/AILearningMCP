@@ -873,6 +873,51 @@ func TestCreateOAuthClientWithSecret(t *testing.T) {
 	}
 }
 
+// ─── GetRecentLearnerEvents ─────────────────────────────────────────────────
+
+func TestGetRecentLearnerEvents_ReturnsMasteryThresholdAndStreakStart(t *testing.T) {
+	store := setupTestDB(t)
+	now := time.Now().UTC()
+
+	// L1 is pre-created by setupTestDB; use INSERT OR IGNORE to be safe.
+	if _, err := store.db.Exec(`INSERT OR IGNORE INTO learners (id,email,password_hash,objective,created_at) VALUES ('L1','x@t.com','h','o',?)`, now); err != nil {
+		t.Fatal(err)
+	}
+	// concept_state with p_mastery >= 0.70 today -> mastery_threshold event.
+	// Insert listing the columns we explicitly want; rest take their DEFAULTs.
+	if _, err := store.db.Exec(
+		`INSERT INTO concept_states (learner_id, concept, p_mastery, stability, difficulty, elapsed_days, reps, lapses, card_state, last_review, next_review, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"L1", "x", 0.85, 5.0, 0.3, 1, 5, 0, "review", now, now, now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	// 3 consecutive interactions (today, -1, -2) -> streak_start at oldest.
+	for _, off := range []int{0, -1, -2} {
+		if _, err := store.db.Exec(
+			`INSERT INTO interactions (learner_id, concept, activity_type, success, created_at) VALUES (?, 'x', 'RECALL', 1, ?)`,
+			"L1", now.AddDate(0, 0, off),
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	events, err := store.GetRecentLearnerEvents("L1", now.AddDate(0, 0, -7))
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	kinds := map[string]bool{}
+	for _, e := range events {
+		kinds[e.Kind] = true
+	}
+	if !kinds["mastery_threshold"] {
+		t.Errorf("expected mastery_threshold event, got %v", events)
+	}
+	if !kinds["streak_start"] {
+		t.Errorf("expected streak_start event, got %v", events)
+	}
+}
+
 // ─── GetActivityStreak ──────────────────────────────────────────────────────
 
 func TestGetActivityStreak(t *testing.T) {
