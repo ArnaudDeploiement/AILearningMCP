@@ -135,15 +135,20 @@
       <rect width="100%" height="100%" fill="url(#cv4g1)"/>
     </svg>
 
-    <!-- HEADER : title + meta -->
-    <div class="anim-fade-up anim-fade-up-1" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;position:relative;">
-      <div>
+    <!-- HEADER : title + meta + controls -->
+    <div class="anim-fade-up anim-fade-up-1" style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px;position:relative;flex-wrap:wrap;">
+      <div style="flex:1;min-width:240px;">
         <div style="font-family:ui-monospace,'JetBrains Mono',monospace;font-size:11px;letter-spacing:2.4px;color:var(--cream-500);text-transform:uppercase;">Carte de connaissance</div>
         <div id="domain-name" style="font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-0.6px;line-height:1.2;color:var(--cream-100);"></div>
         <div id="personal-goal" style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:18px;color:var(--accent-300);margin-top:4px;line-height:1.3;"></div>
       </div>
-      <div style="text-align:right;">
-        <div id="streak" style="font-size:13px;color:var(--cream-300);margin-top:6px;"></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div id="cockpit-controls" style="display:flex;gap:8px;align-items:center;">
+          <label for="domain-select" style="font-family:ui-monospace,monospace;font-size:10px;letter-spacing:1.4px;color:var(--cream-500);text-transform:uppercase;">Domaine</label>
+          <select id="domain-select" style="background:var(--bg-panel);color:var(--cream-100);border:1px solid var(--border-subtle);border-radius:var(--radius-sm,4px);padding:4px 8px;font-family:ui-monospace,monospace;font-size:12px;cursor:pointer;"></select>
+          <button id="fullscreen-toggle" type="button" title="Basculer en plein écran" aria-label="Basculer en plein écran" style="background:transparent;color:var(--cream-300);border:1px solid var(--border-subtle);border-radius:var(--radius-sm,4px);padding:4px 8px;font-family:ui-monospace,monospace;font-size:12px;cursor:pointer;display:none;">⛶ Plein écran</button>
+        </div>
+        <div id="streak" style="font-size:13px;color:var(--cream-300);"></div>
       </div>
     </div>
 
@@ -374,6 +379,8 @@
     setText("progress-text", (snap.solid || 0) + " / " + total + " solides");
     renderGraph(snap);
     renderMetacog(snap);
+    syncDomainSelect(snap);
+    notifySize();
   }
 
   function renderGraph(s) {
@@ -381,6 +388,18 @@
     if (!svg) return;
     clearChildren(svg);
     const layout = computeLayout(s.concepts || [], s.edges || []);
+    // Compute viewBox from actual node bounds so the graph never clips,
+    // regardless of concept count or graph depth. The label sits ~30px
+    // below each node so we pad bottom by 40, top/left/right by 30.
+    let maxX = 200, maxY = 160;
+    for (const pos of Object.values(layout)) {
+      if (pos.x + 30 > maxX) maxX = pos.x + 30;
+      if (pos.y + 40 > maxY) maxY = pos.y + 40;
+    }
+    svg.setAttribute("viewBox", "0 0 " + maxX + " " + maxY);
+    // Set the SVG height proportional to viewBox so wide graphs don't get
+    // squashed into a 320px-tall box.
+    svg.style.height = Math.max(180, Math.min(maxY, 520)) + "px";
     for (const e of (s.edges || [])) drawEdge(svg, e, layout);
     for (const n of (s.concepts || [])) drawNode(svg, n, layout);
   }
@@ -528,11 +547,15 @@
         .then((result) => {
           if (result && result.structuredContent) {
             globalData = result.structuredContent;
-            renderGlobal();
+            renderGlobalAndNotify();
           }
         });
     }
+    // Tab visibility itself can change the body height; report it.
+    if (typeof notifySize === "function") notifySize();
   }
+
+  function renderGlobalAndNotify() { renderGlobal(); notifySize(); }
 
   function renderGlobal() {
     if (!globalData) return;
@@ -681,6 +704,118 @@
     });
   });
 
+  // ----- Domain selector -----
+  // Populates the <select> from snap.available_domains; on change refetches the
+  // OLMGraph for the chosen domain via get_olm_snapshot scope=graph (which does
+  // NOT carry _meta.ui.resourceUri, so it doesn't re-trigger a new iframe).
+  function syncDomainSelect(s) {
+    const sel = document.getElementById("domain-select");
+    if (!sel) return;
+    const domains = s.available_domains || [];
+    if (domains.length <= 1) {
+      sel.style.display = "none";
+      const lbl = sel.previousElementSibling;
+      if (lbl && lbl.tagName === "LABEL") lbl.style.display = "none";
+      return;
+    }
+    sel.style.display = "";
+    const lbl = sel.previousElementSibling;
+    if (lbl && lbl.tagName === "LABEL") lbl.style.display = "";
+    // Only rebuild options if the list actually changed.
+    const want = domains.map(d => d.id).join(",");
+    if (sel.dataset.builtFor !== want) {
+      while (sel.firstChild) sel.removeChild(sel.firstChild);
+      for (const d of domains) {
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = d.name;
+        sel.appendChild(opt);
+      }
+      sel.dataset.builtFor = want;
+    }
+    sel.value = s.domain_id || "";
+  }
+
+  const domainSelect = document.getElementById("domain-select");
+  if (domainSelect) {
+    domainSelect.addEventListener("change", (ev) => {
+      const id = ev.target.value;
+      if (!id) return;
+      request("tools/call", {
+        name: "get_olm_snapshot",
+        arguments: { scope: "graph", domain_id: id }
+      }).then((result) => {
+        if (result && result.structuredContent) {
+          snap = result.structuredContent;
+          render();
+        }
+      });
+    });
+  }
+
+  // ----- Display mode (fullscreen) -----
+  let currentDisplayMode = "inline";
+  let availableHostModes = ["inline"];
+
+  function syncFullscreenButton() {
+    const btn = document.getElementById("fullscreen-toggle");
+    if (!btn) return;
+    const canFullscreen = availableHostModes.indexOf("fullscreen") !== -1;
+    btn.style.display = canFullscreen ? "" : "none";
+    btn.textContent = currentDisplayMode === "fullscreen" ? "⤢ Réduire" : "⛶ Plein écran";
+    btn.setAttribute("aria-label", currentDisplayMode === "fullscreen" ? "Réduire" : "Basculer en plein écran");
+  }
+
+  const fsBtn = document.getElementById("fullscreen-toggle");
+  if (fsBtn) {
+    fsBtn.addEventListener("click", () => {
+      const target = currentDisplayMode === "fullscreen" ? "inline" : "fullscreen";
+      request("ui/request-display-mode", { mode: target }).then((result) => {
+        if (result && result.mode) {
+          currentDisplayMode = result.mode;
+          syncFullscreenButton();
+          notifySize();
+        }
+      });
+    });
+  }
+
+  // ----- Size negotiation -----
+  // Spec §size-changed: the host listens for ui/notifications/size-changed and
+  // resizes the iframe to match the body's content size. Without this the
+  // iframe stays at the host's default (often very small in inline mode).
+  let lastReportedHeight = 0;
+  function notifySize() {
+    // Defer one frame so the browser has laid out the content we just rendered.
+    requestAnimationFrame(() => {
+      const h = document.documentElement.scrollHeight || document.body.scrollHeight;
+      const w = document.documentElement.scrollWidth  || document.body.scrollWidth;
+      if (Math.abs(h - lastReportedHeight) < 4) return;
+      lastReportedHeight = h;
+      send("ui/notifications/size-changed", { width: w, height: h });
+    });
+  }
+
+  // host-context-changed: track display-mode + the host's set of available modes
+  // so we can keep the toggle button in sync with what the host actually permits.
+  function applyHostContext(ctx) {
+    if (!ctx) return;
+    if (ctx.displayMode) currentDisplayMode = ctx.displayMode;
+    if (Array.isArray(ctx.availableDisplayModes)) availableHostModes = ctx.availableDisplayModes;
+    syncFullscreenButton();
+  }
+
+  // We extend the existing message router by hooking an extra listener; the
+  // primary listener (above) already handles tool-input / tool-result and
+  // pendingRequests. This one handles host-context-changed only.
+  window.addEventListener('message', (ev) => {
+    const m = ev.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.method === "ui/notifications/host-context-changed" && m.params) {
+      applyHostContext(m.params);
+    }
+  });
+
   // MCP Apps handshake — View → Host: ui/initialize, then ui/notifications/initialized.
   // Per spec (modelcontextprotocol/ext-apps 2026-01-26), the host MUST NOT push
   // ui/notifications/tool-input or ui/notifications/tool-result before it
@@ -688,10 +823,12 @@
   // iframe renders empty in Claude Desktop / claude.ai.
   request("ui/initialize", {
     appCapabilities: {
-      availableDisplayModes: ["inline"]
+      availableDisplayModes: ["inline", "fullscreen"]
     }
-  }).then(() => {
+  }).then((result) => {
+    if (result && result.hostContext) applyHostContext(result.hostContext);
     send("ui/notifications/initialized", {});
+    notifySize();
   });
 })();
 </script>

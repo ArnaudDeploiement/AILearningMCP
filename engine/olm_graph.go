@@ -86,11 +86,22 @@ func BuildOLMGraph(store *db.Store, learnerID, domainID string) (*OLMGraph, erro
 	// Streak enriches the UI only — DB error means zero, which is safe.
 	streak, _ := store.GetActivityStreak(learnerID)
 
+	// Available domains for the cockpit's selector. Best-effort: a DB error
+	// here just hides the selector, the rest of the cockpit stays usable.
+	var availableDomains []DomainRef
+	if domains, err := store.GetDomainsByLearner(learnerID, false /*includeArchived*/); err == nil {
+		availableDomains = make([]DomainRef, 0, len(domains))
+		for _, d := range domains {
+			availableDomains = append(availableDomains, DomainRef{ID: d.ID, Name: d.Name})
+		}
+	}
+
 	return &OLMGraph{
-		OLMSnapshot: snap,
-		Concepts:    nodes,
-		Edges:       edges,
-		Streak:      streak,
+		OLMSnapshot:      snap,
+		Concepts:         nodes,
+		Edges:            edges,
+		Streak:           streak,
+		AvailableDomains: availableDomains,
 	}, nil
 }
 
@@ -125,12 +136,21 @@ type GraphEdge struct {
 	Type EdgeType `json:"type"`
 }
 
+// DomainRef is one entry in OLMGraph.AvailableDomains — the cockpit's domain
+// selector reads this list to let the learner switch between active domains
+// without re-running open_cockpit.
+type DomainRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // OLMGraph is the structured payload exposed to the cockpit iframe.
 // It composes OLMSnapshot (mastery distribution + focus + metacog + KST progress)
 // with the per-concept graph data needed to render the visual map.
 type OLMGraph struct {
 	*OLMSnapshot
-	Concepts []GraphNode `json:"concepts"`
-	Edges    []GraphEdge `json:"edges"`
-	Streak   int         `json:"streak"`
+	Concepts         []GraphNode `json:"concepts"`
+	Edges            []GraphEdge `json:"edges"`
+	Streak           int         `json:"streak"`
+	AvailableDomains []DomainRef `json:"available_domains"`
 }

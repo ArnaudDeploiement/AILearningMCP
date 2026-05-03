@@ -69,3 +69,26 @@ func TestEmbeddedCockpitHTML_HasTab2Markers(t *testing.T) {
 		}
 	}
 }
+
+func TestEmbeddedCockpitHTML_HasResponsiveAndDomainMarkers(t *testing.T) {
+	data, err := FS.ReadFile("cockpit.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(data)
+	mustContain := []string{
+		"id=\"domain-select\"",                 // domain selector UI
+		"id=\"fullscreen-toggle\"",             // fullscreen toggle button
+		"available_domains",                    // OLMGraph payload key
+		"ui/request-display-mode",              // View → Host request
+		"ui/notifications/size-changed",        // View → Host size notification
+		"ui/notifications/host-context-changed", // Host → View context updates
+		"availableDisplayModes",                // capability advertised in ui/initialize
+		"\"fullscreen\"",                       // declared mode
+	}
+	for _, m := range mustContain {
+		if !strings.Contains(body, m) {
+			t.Errorf("cockpit.html missing required marker: %q", m)
+		}
+	}
+}
