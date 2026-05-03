@@ -2,11 +2,401 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Cockpit — chargement</title>
-<style>body { background: #0c0908; color: #f5ede5; font-family: system-ui; padding: 32px; }</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:;">
+<title>Cockpit — état d'apprentissage</title>
+<style>
+  /* ────────────────────────────────────────────────────────────
+     Design tokens — single source of truth
+     Derived from docs/banner.svg ; WCAG 2.2 AA + APCA Lc 75+
+     ──────────────────────────────────────────────────────────── */
+  html, body { margin: 0; padding: 0; }
+  body.cockpit-v4 {
+    --bg-base:        #0c0908;
+    --bg-panel:       #15110f;
+    --bg-elevated:    #1d1815;
+
+    --cream-50:       #faf6f1;
+    --cream-100:      #f5ede5;
+    --cream-300:      #e0d8cf;
+    --cream-500:      #bdb6ad;
+    --cream-700:      #857e76;
+
+    --accent-300:     #f3a875;
+    --accent-500:     #e8804a;
+    --accent-700:     #da6e38;
+
+    --border-subtle:  rgba(245, 237, 229, 0.08);
+    --border-default: rgba(245, 237, 229, 0.15);
+    --border-accent:  rgba(232, 128, 74, 0.45);
+
+    --shadow-focus:   0 0 0 3px rgba(232, 128, 74, 0.25);
+    --shadow-lift:    0 4px 14px rgba(0, 0, 0, 0.4);
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+
+    --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    background: var(--bg-base);
+    color: var(--cream-100);
+    font-family: system-ui, -apple-system, 'Inter Tight', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     Animations
+     ──────────────────────────────────────────────────────────── */
+  @keyframes cv4-pulse-halo {
+    0%, 100% { transform: scale(1); opacity: 0.45; }
+    50%      { transform: scale(1.08); opacity: 0.7; }
+  }
+  @keyframes cv4-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cv4-fill-bar {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+  @keyframes cv4-tab-underline {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+  @keyframes cv4-shimmer-edge {
+    0%   { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -18; }
+  }
+
+  .cockpit-v4 .anim-fade-up           { animation: cv4-fade-up 0.55s var(--ease-out) both; }
+  .cockpit-v4 .anim-fade-up-1         { animation-delay: 0.05s; }
+  .cockpit-v4 .anim-fade-up-2         { animation-delay: 0.12s; }
+  .cockpit-v4 .anim-fade-up-3         { animation-delay: 0.20s; }
+  .cockpit-v4 .anim-fade-up-4         { animation-delay: 0.28s; }
+  .cockpit-v4 .focus-halo             { animation: cv4-pulse-halo 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  .cockpit-v4 .progress-segment       { transform-origin: left; animation: cv4-fill-bar 0.7s var(--ease-out) both; }
+  .cockpit-v4 .progress-segment-1     { animation-delay: 0.30s; }
+  .cockpit-v4 .progress-segment-2     { animation-delay: 0.38s; }
+  .cockpit-v4 .progress-segment-3     { animation-delay: 0.46s; }
+  .cockpit-v4 .progress-segment-4     { animation-delay: 0.54s; }
+  .cockpit-v4 .progress-segment-5     { animation-delay: 0.62s; }
+  .cockpit-v4 .tab-active::after      { animation: cv4-tab-underline 0.4s var(--ease-spring) both; transform-origin: left; }
+  .cockpit-v4 .edge-active            { stroke-dasharray: 12 6; animation: cv4-shimmer-edge 1.6s linear infinite; }
+
+  /* Hover micro-interactions */
+  .cockpit-v4 .node-interactive { cursor: pointer; transition: transform 0.18s var(--ease-spring), filter 0.18s var(--ease-out); transform-origin: center; transform-box: fill-box; }
+  .cockpit-v4 .node-interactive:hover { transform: scale(1.08); filter: brightness(1.1); }
+  .cockpit-v4 .cta { transition: background 0.15s var(--ease-out), transform 0.12s var(--ease-out), box-shadow 0.18s var(--ease-out); }
+  .cockpit-v4 .cta:hover { background: var(--accent-700); transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+  .cockpit-v4 .cta:active { transform: translateY(0); }
+  .cockpit-v4 .cta:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+  .cockpit-v4 .tab-link { transition: color 0.15s var(--ease-out); }
+  .cockpit-v4 .tab-link:hover:not([aria-disabled="true"]) { color: var(--cream-100); }
+  .cockpit-v4 .tab-link[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+
+  /* Reduced motion respect (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce) {
+    .cockpit-v4 .focus-halo,
+    .cockpit-v4 .progress-segment,
+    .cockpit-v4 .anim-fade-up,
+    .cockpit-v4 .tab-active::after,
+    .cockpit-v4 .edge-active { animation: none; }
+    .cockpit-v4 .node-interactive { transition: none; }
+  }
+
+  /* Tab styles */
+  .cockpit-v4 .tabs { display: flex; gap: 28px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 22px; }
+  .cockpit-v4 .tab-link {
+    position: relative; padding: 10px 0;
+    font-family: ui-monospace, 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 1.8px; text-transform: uppercase;
+    color: var(--cream-500); text-decoration: none;
+    background: none; border: none; cursor: pointer;
+  }
+  .cockpit-v4 .tab-active { color: var(--cream-100); }
+  .cockpit-v4 .tab-active::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: var(--accent-500);
+  }
+
+  /* Metacog signal — hidden by default until JS decides whether to show */
+  .cockpit-v4 .metacog-signal { display: none; margin-top: 18px; padding: 14px 16px; background: linear-gradient(90deg, rgba(232,128,74,0.10) 0%, transparent 60%); border-top: 1px solid rgba(232,128,74,0.28); }
+</style>
 </head>
-<body>
-<p>Cockpit en cours de chargement.</p>
-<p style="color:#bdb6ad;font-size:13px;">Si ce message persiste, ton client MCP n'a pas chargé la ressource ui://cockpit.</p>
+<body class="cockpit-v4">
+  <div class="cockpit-v4-root" style="padding:32px 36px;position:relative;overflow:hidden;">
+
+    <!-- Grid background (banner echo) -->
+    <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.04;pointer-events:none;" aria-hidden="true">
+      <defs><pattern id="cv4g1" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0L0 0 0 32" fill="none" stroke="#f5ede5" stroke-width="1"/></pattern></defs>
+      <rect width="100%" height="100%" fill="url(#cv4g1)"/>
+    </svg>
+
+    <!-- HEADER : title + meta -->
+    <div class="anim-fade-up anim-fade-up-1" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;position:relative;">
+      <div>
+        <div style="font-family:ui-monospace,'JetBrains Mono',monospace;font-size:11px;letter-spacing:2.4px;color:var(--cream-500);text-transform:uppercase;">Carte de connaissance</div>
+        <div id="domain-name" style="font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-0.6px;line-height:1.2;color:var(--cream-100);"></div>
+        <div id="personal-goal" style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:18px;color:var(--accent-300);margin-top:4px;line-height:1.3;"></div>
+      </div>
+      <div style="text-align:right;">
+        <div id="streak" style="font-size:13px;color:var(--cream-300);margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- TABS (premium, animated underline) -->
+    <div class="tabs anim-fade-up anim-fade-up-2" role="tablist">
+      <button class="tab-link tab-active" role="tab" aria-selected="true">Cette session</button>
+      <button class="tab-link" role="tab" aria-selected="false" aria-disabled="true" title="à venir" disabled>Modèle global</button>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="anim-fade-up anim-fade-up-2" style="display:flex;gap:18px;align-items:center;margin-bottom:14px;font-family:ui-monospace,'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.3px;color:var(--cream-500);text-transform:uppercase;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#e8804a"/></svg>solide</div>
+      <div style="display:flex;align-items:center;gap:6px;"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#f3a875"/></svg>en cours</div>
+      <div style="display:flex;align-items:center;gap:6px;"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#da6e38"/></svg>fragile</div>
+      <div style="display:flex;align-items:center;gap:6px;"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="#e8804a"/><circle cx="8" cy="8" r="7" fill="none" stroke="#f3a875" stroke-width="1.5"/></svg><span style="color:var(--accent-300);">focus</span></div>
+      <div style="display:flex;align-items:center;gap:6px;"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="4" fill="none" stroke="#8a8378" stroke-width="1.5"/></svg>pas commencé</div>
+    </div>
+
+    <!-- KST GRAPH -->
+    <div class="anim-fade-up anim-fade-up-3" style="background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:24px;margin-bottom:18px;position:relative;">
+      <svg id="olm-graph" viewBox="0 0 700 320" style="width:100%;height:320px;display:block;" role="img" aria-label="Graphe de connaissance"></svg>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="anim-fade-up anim-fade-up-4" style="display:grid;grid-template-columns:1.5fr 1fr auto;gap:18px;align-items:stretch;">
+
+      <div style="background:var(--bg-panel);border-left:3px solid var(--accent-500);padding:16px 18px;border-radius:0 var(--radius-md) var(--radius-md) 0;">
+        <div style="font-family:ui-monospace,monospace;font-size:10px;letter-spacing:1.6px;color:var(--accent-300);text-transform:uppercase;margin-bottom:6px;">Le palier suivant</div>
+        <div id="focus-concept" style="font-size:16px;font-weight:600;color:var(--cream-100);line-height:1.3;"></div>
+        <div id="focus-reason" style="font-size:13px;color:var(--cream-300);margin-top:4px;"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;justify-content:center;">
+        <div style="font-family:ui-monospace,monospace;font-size:10px;letter-spacing:1.6px;color:var(--cream-500);text-transform:uppercase;margin-bottom:8px;">Progression</div>
+        <div style="display:flex;gap:5px;margin-bottom:6px;">
+          <div class="progress-segment progress-segment-1" style="flex:1;height:6px;background:var(--cream-100);border-radius:1px;"></div>
+          <div class="progress-segment progress-segment-2" style="flex:1;height:6px;background:var(--cream-100);border-radius:1px;"></div>
+          <div class="progress-segment progress-segment-3" style="flex:1;height:6px;background:var(--cream-100);opacity:0.55;border-radius:1px;"></div>
+          <div class="progress-segment progress-segment-4" style="flex:1;height:6px;background:transparent;border:1px dashed rgba(245,237,229,0.5);border-radius:1px;"></div>
+          <div class="progress-segment progress-segment-5" style="flex:1;height:6px;background:transparent;border:1px dashed rgba(245,237,229,0.5);border-radius:1px;"></div>
+        </div>
+        <div id="progress-text" style="font-size:13px;color:var(--cream-300);"></div>
+      </div>
+
+      <button id="cta-attack" class="cta" type="button" style="background:var(--accent-500);color:var(--bg-base);border:2px solid var(--accent-500);padding:0 24px;font-family:system-ui,sans-serif;font-size:14px;font-weight:700;border-radius:var(--radius-md);cursor:pointer;display:flex;align-items:center;gap:8px;">
+        j'attaque
+        <span style="font-size:18px;" aria-hidden="true">&rarr;</span>
+      </button>
+    </div>
+
+    <!-- METACOG SIGNAL -->
+    <div id="metacog-line" class="anim-fade-up anim-fade-up-4 metacog-signal">
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <svg width="18" height="18" style="flex-shrink:0;margin-top:2px;" viewBox="0 0 18 18" aria-hidden="true">
+          <circle cx="9" cy="9" r="7.5" fill="none" stroke="#f3a875" stroke-width="1.5"/>
+          <text x="9" y="13" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#f3a875">i</text>
+        </svg>
+        <div style="flex:1;">
+          <div style="font-family:ui-monospace,monospace;font-size:10px;letter-spacing:1.6px;color:var(--accent-300);text-transform:uppercase;margin-bottom:4px;">Signal · métacognition</div>
+          <div class="signal-text" style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:16px;color:var(--cream-100);line-height:1.4;"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function() {
+  let snap = null;
+
+  function dispatch(method, params) {
+    window.parent.postMessage({ jsonrpc: "2.0", id: Date.now(), method: method, params: params }, "*");
+  }
+
+  function clearChildren(el) {
+    while (el && el.firstChild) el.removeChild(el.firstChild);
+  }
+
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text || "";
+  }
+
+  function svgNode(name, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+    return el;
+  }
+
+  window.addEventListener('message', (ev) => {
+    const m = ev.data;
+    if (m && m.params && m.params.structuredContent) {
+      snap = m.params.structuredContent;
+      render();
+    }
+  });
+
+  function render() {
+    if (!snap) return;
+    setText("domain-name", snap.domain_name);
+    setText("personal-goal", snap.personal_goal);
+    setText("streak", snap.streak ? snap.streak + " jours d'affilée" : "");
+    setText("focus-concept", snap.focus_concept || "");
+    setText("focus-reason", snap.focus_reason || "");
+    const total = (snap.solid || 0) + (snap.in_progress || 0) + (snap.fragile || 0) + (snap.not_started || 0);
+    setText("progress-text", (snap.solid || 0) + " / " + total + " solides");
+    renderGraph(snap);
+    renderMetacog(snap);
+  }
+
+  function renderGraph(s) {
+    const svg = document.getElementById("olm-graph");
+    if (!svg) return;
+    clearChildren(svg);
+    const layout = computeLayout(s.concepts || [], s.edges || []);
+    for (const e of (s.edges || [])) drawEdge(svg, e, layout);
+    for (const n of (s.concepts || [])) drawNode(svg, n, layout);
+  }
+
+  // computeLayout: simple level-based layout. Compute level (longest path
+  // from a root) for each concept, then x = level * spacing, y =
+  // position-in-level * spacing.
+  function computeLayout(concepts, edges) {
+    const incoming = {};
+    for (const e of edges) {
+      (incoming[e.to] = incoming[e.to] || []).push(e.from);
+    }
+    const level = {};
+    const queue = [];
+    for (const c of concepts) {
+      if (!incoming[c.concept] || incoming[c.concept].length === 0) {
+        level[c.concept] = 0;
+        queue.push(c.concept);
+      }
+    }
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const e of edges) {
+        if (e.from === cur) {
+          const candidate = (level[cur] || 0) + 1;
+          if (level[e.to] === undefined || level[e.to] < candidate) {
+            level[e.to] = candidate;
+            queue.push(e.to);
+          }
+        }
+      }
+    }
+    const byLevel = {};
+    for (const c of concepts) {
+      const l = level[c.concept] || 0;
+      (byLevel[l] = byLevel[l] || []).push(c.concept);
+    }
+    const out = {};
+    const xstep = 130, ystep = 80, xoffset = 60, yoffset = 60;
+    for (const lvl of Object.keys(byLevel)) {
+      const list = byLevel[lvl];
+      list.forEach((name, idx) => {
+        out[name] = {
+          x: xoffset + parseInt(lvl, 10) * xstep,
+          y: yoffset + idx * ystep,
+        };
+      });
+    }
+    return out;
+  }
+
+  function drawNode(svg, n, layout) {
+    const pos = layout[n.concept];
+    if (!pos) return;
+    const g = svgNode("g", {
+      class: "node node-interactive node-" + n.state,
+      transform: "translate(" + pos.x + "," + pos.y + ")",
+    });
+    const radius = (n.state === "focus") ? 18 : (n.state === "solid" ? 14 : 12);
+    const fillByState = {
+      not_started: "transparent",
+      fragile: "#da6e38",
+      in_progress: "#f3a875",
+      solid: "#e8804a",
+      focus: "#e8804a",
+    };
+    const strokeByState = {
+      not_started: "#8a8378",
+      fragile: "#da6e38",
+      in_progress: "#f3a875",
+      solid: "#e8804a",
+      focus: "#f3a875",
+    };
+    const circle = svgNode("circle", {
+      r: String(radius),
+      fill: fillByState[n.state] || "transparent",
+      stroke: strokeByState[n.state] || "#8a8378",
+      "stroke-width": (n.state === "focus") ? "3" : "2",
+      class: (n.state === "focus") ? "focus-halo" : "",
+    });
+    g.appendChild(circle);
+
+    const label = svgNode("text", {
+      x: "0",
+      y: String(radius + 16),
+      "text-anchor": "middle",
+      fill: "#f5ede5",
+      "font-size": "12",
+      "font-family": "ui-monospace,SFMono-Regular,monospace",
+    });
+    label.textContent = n.concept;
+    g.appendChild(label);
+
+    const title = svgNode("title", {});
+    title.textContent = n.concept + " — " + String(n.state || "").replace("_", " ");
+    g.appendChild(title);
+
+    svg.appendChild(g);
+  }
+
+  function drawEdge(svg, e, layout) {
+    const a = layout[e.from], b = layout[e.to];
+    if (!a || !b) return;
+    const opacityByType = { traversed: 0.4, active: 0.8, future: 0.45 };
+    const colorByType = { traversed: "#a6968a", active: "#f3a875", future: "#a6968a" };
+    const strokeWidthByType = { traversed: 1.5, active: 2.5, future: 1.5 };
+    const line = svgNode("line", {
+      x1: String(a.x), y1: String(a.y), x2: String(b.x), y2: String(b.y),
+      stroke: colorByType[e.type] || "#a6968a",
+      "stroke-width": String(strokeWidthByType[e.type] || 1.5),
+      "stroke-opacity": String(opacityByType[e.type] || 0.45),
+      class: "edge edge-" + e.type,
+    });
+    svg.appendChild(line);
+  }
+
+  function renderMetacog(s) {
+    const container = document.getElementById("metacog-line");
+    if (!container) return;
+    let text = "";
+    if (s.calibration_bias > 1.5) text = "Tu sur-estimes un peu tes acquis depuis 3 sessions — quelques exercices à froid t'aideront à recalibrer.";
+    else if (s.calibration_bias < -1.5) text = "Tu sous-estimes un peu tes acquis — tu en sais plus que tu crois.";
+    else if (s.autonomy_trend === "declining") text = "Tu t'appuies un peu plus sur les hints récemment — tente quelques exercices sans aide pour voir.";
+    else if (s.affect_trend === "declining") text = "Les 3 dernières sessions ont été éprouvantes — n'hésite pas à alléger ou faire une pause.";
+    container.style.display = text ? "block" : "none";
+    const txt = container.querySelector(".signal-text");
+    if (txt) txt.textContent = text;
+  }
+
+  const cta = document.querySelector("#cta-attack");
+  if (cta) cta.addEventListener("click", () => {
+    if (!snap) return;
+    dispatch("tools/call", {
+      name: "learning_negotiation",
+      arguments: { focus: snap.focus_concept, domain_id: snap.domain_id }
+    });
+  });
+})();
+</script>
 </body>
 </html>
