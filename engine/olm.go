@@ -150,7 +150,35 @@ func BuildOLMSnapshot(store *db.Store, learnerID, domainID string) (*OLMSnapshot
 		}
 	}
 
+	// Metacognitive signals — only set if a clear trend exists across the
+	// last 3 affects (or if calibration bias exceeds the actionable threshold).
+	affects, _ := store.GetRecentAffectStates(learnerID, 3)
+	if len(affects) >= 3 {
+		snap.AutonomyTrend = trendDirection(affects[0].AutonomyScore - affects[2].AutonomyScore)
+		snap.AffectTrend = trendDirection(float64(affects[0].Satisfaction - affects[2].Satisfaction))
+	}
+	bias, _ := store.GetCalibrationBias(learnerID, 20)
+	snap.CalibrationBias = bias
+
 	return snap, nil
+}
+
+// trendDirection returns "improving", "stable", or "declining" based on the
+// signed difference between the most-recent and the older value.
+//
+// The dead band (|diff| < threshold → "stable") avoids flagging noise as a
+// trend. Threshold 0.10 for autonomy_score (which lives in 0..1); same scalar
+// works as a coarse 1-step diff on Likert satisfaction (1..4).
+func trendDirection(diff float64) string {
+	const threshold = 0.10
+	switch {
+	case diff > threshold:
+		return "improving"
+	case diff < -threshold:
+		return "declining"
+	default:
+		return "stable"
+	}
 }
 
 // resolveActiveDomain returns the domain to use for the OLM. If domainID is

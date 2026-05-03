@@ -193,3 +193,41 @@ func TestBuildOLMSnapshot_FocusFallsBackToFrontier(t *testing.T) {
 		t.Errorf("FocusReason=%q, want 'prochain palier'", snap.FocusReason)
 	}
 }
+
+func TestBuildOLMSnapshot_MetacognitiveSignals(t *testing.T) {
+	store, raw := newOLMTestStore(t)
+	seedLearner(t, raw, "L1")
+	seedDomain(t, raw, "L1", "math", []string{"a"}, nil, false)
+	seedConceptState(t, store, "L1", "a", 0.50, "review")
+
+	// Affect history. UpsertAffectState orders by created_at desc; we want
+	// the most recent to have AutonomyScore=0.3 and the oldest (3rd back)
+	// 0.7. Insert oldest first so created_at increases monotonically.
+	for _, score := range []float64{0.7, 0.5, 0.3} {
+		af := &models.AffectState{
+			LearnerID:     "L1",
+			SessionID:     fmt.Sprintf("s%.0f", score*10),
+			Energy:        3,
+			Satisfaction:  2,
+			AutonomyScore: score,
+		}
+		if err := store.UpsertAffectState(af); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond) // ensure distinct created_at
+	}
+
+	snap, err := BuildOLMSnapshot(store, "L1", "")
+	if err != nil {
+		t.Fatalf("BuildOLMSnapshot: %v", err)
+	}
+	// Most recent autonomy (0.3) < oldest of the 3 (0.7) by 0.40 → declining.
+	if snap.AutonomyTrend != "declining" {
+		t.Errorf("AutonomyTrend=%q, want declining", snap.AutonomyTrend)
+	}
+	if snap.AffectTrend != "stable" && snap.AffectTrend != "" {
+		// All 3 satisfaction = 2 → no diff → stable. Empty also acceptable
+		// if implementation returns "" when diff is below threshold.
+		t.Errorf("AffectTrend=%q, want stable or empty", snap.AffectTrend)
+	}
+}
