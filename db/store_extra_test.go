@@ -878,7 +878,7 @@ func TestCreateOAuthClientWithSecret(t *testing.T) {
 func TestGetActivityStreak(t *testing.T) {
 	store := setupTestDB(t)
 	now := time.Now().UTC()
-	day := func(offset int) time.Time { return now.Add(time.Duration(offset) * 24 * time.Hour) }
+	day := func(offset int) time.Time { return now.AddDate(0, 0, offset) }
 
 	mustExec := func(q string, args ...any) {
 		t.Helper()

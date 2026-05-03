@@ -1056,6 +1056,8 @@ func (s *Store) CleanupExpiredRefreshTokens() (int64, error) {
 // Implementation: pulls all distinct interaction days (DESC), then counts
 // from today backwards until the first gap.
 func (s *Store) GetActivityStreak(learnerID string) (int, error) {
+	// substr — modernc/sqlite stores time.Time as RFC3339 with nanoseconds, on
+	// which SQLite's date() returns NULL. substr reliably extracts YYYY-MM-DD.
 	rows, err := s.db.Query(
 		`SELECT DISTINCT substr(created_at, 1, 10) AS d
 		 FROM interactions
@@ -1076,18 +1078,22 @@ func (s *Store) GetActivityStreak(learnerID string) (int, error) {
 		}
 		days = append(days, d)
 	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("get activity streak rows: %w", err)
+	}
 	if len(days) == 0 {
 		return 0, nil
 	}
 
-	today := time.Now().UTC().Format("2006-01-02")
+	now := time.Now().UTC()
+	today := now.Format("2006-01-02")
 	if days[0] != today {
 		return 0, nil
 	}
 
 	streak := 1
 	for i := 1; i < len(days); i++ {
-		expected := time.Now().UTC().AddDate(0, 0, -i).Format("2006-01-02")
+		expected := now.AddDate(0, 0, -i).Format("2006-01-02")
 		if days[i] != expected {
 			break
 		}
