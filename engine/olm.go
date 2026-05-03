@@ -17,6 +17,7 @@ package engine
 import (
 	"fmt"
 
+	"tutor-mcp/algorithms"
 	"tutor-mcp/db"
 	"tutor-mcp/models"
 )
@@ -72,6 +73,38 @@ func BuildOLMSnapshot(store *db.Store, learnerID, domainID string) (*OLMSnapshot
 		DomainName:   domain.Name,
 		PersonalGoal: domain.PersonalGoal,
 	}
+
+	allStates, err := store.GetConceptStatesByLearner(learnerID)
+	if err != nil {
+		return nil, fmt.Errorf("olm: get states: %w", err)
+	}
+	statesByConcept := make(map[string]*models.ConceptState, len(allStates))
+	for _, cs := range allStates {
+		statesByConcept[cs.Concept] = cs
+	}
+
+	for _, c := range domain.Graph.Concepts {
+		cs, hasState := statesByConcept[c]
+		if !hasState || cs.CardState == "new" {
+			snap.NotStarted++
+			continue
+		}
+		if cs.PMastery >= algorithms.KSTMasteryThreshold {
+			snap.Solid++
+			continue
+		}
+		if cs.PMastery < 0.30 {
+			snap.Fragile++
+			continue
+		}
+		retention := algorithms.Retrievability(cs.ElapsedDays, cs.Stability)
+		if retention < 0.50 {
+			snap.Fragile++
+			continue
+		}
+		snap.InProgress++
+	}
+
 	return snap, nil
 }
 
