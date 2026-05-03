@@ -84,9 +84,6 @@ func seedConceptState(t *testing.T, store *db.Store, learnerID, concept string, 
 		cs.LastReview = &now
 		cs.ScheduledDays = 7
 	}
-	if err := store.InsertConceptStateIfNotExists(cs); err != nil {
-		t.Fatal(err)
-	}
 	if err := store.UpsertConceptState(cs); err != nil {
 		t.Fatal(err)
 	}
