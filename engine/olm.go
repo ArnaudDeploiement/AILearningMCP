@@ -25,6 +25,18 @@ import (
 	"tutor-mcp/models"
 )
 
+// Calibration bias is "actionable" when |bias| exceeds this threshold.
+// Surfaced both in HasActionable and in metacogLine, so a single source
+// of truth avoids them drifting apart.
+const calibrationActionableThreshold = 1.5
+
+// Discord embed colors for FormatOLMEmbed, keyed on FocusUrgency.
+const (
+	colorCritical = 0xFF6B6B // red
+	colorWarning  = 0xF5A623 // amber
+	colorInfo     = 0xEB459E // pink (default / info)
+)
+
 // OLMSnapshot is the structured Open Learner Model returned to the LLM in
 // session and rendered by the scheduler when no LLM-authored copy is queued.
 // Fields with zero values mean "no signal" — the LLM and the Go fallback
@@ -170,7 +182,6 @@ func BuildOLMSnapshot(store *db.Store, learnerID, domainID string) (*OLMSnapshot
 	}
 
 	// HasActionable: a focus exists OR a metacog signal warrants surfacing.
-	const calibrationActionableThreshold = 1.5
 	if snap.FocusConcept != "" ||
 		math.Abs(snap.CalibrationBias) > calibrationActionableThreshold ||
 		snap.AutonomyTrend == "declining" ||
@@ -280,13 +291,13 @@ func formatFocusReason(a models.Alert) string {
 // goal progress phrase. No pep talk.
 func FormatOLMEmbed(snap *OLMSnapshot) DiscordEmbed {
 	title := "🧭 État du moment"
-	color := 0xEB459E // pink (info / vide)
+	color := colorInfo
 	switch snap.FocusUrgency {
 	case models.UrgencyCritical:
 		title = "🚨 État — un concept à reprendre vite"
-		color = 0xFF6B6B
+		color = colorCritical
 	case models.UrgencyWarning:
-		color = 0xF5A623
+		color = colorWarning
 	}
 
 	var lines []string
@@ -350,11 +361,14 @@ func compactBuckets(snap *OLMSnapshot) string {
 	return strings.Join(parts, " · ")
 }
 
+// metacogLine returns the single most actionable metacognitive sentence,
+// in descending priority: calibration bias, then autonomy trend, then affect
+// trend. Empty string when no signal is active.
 func metacogLine(snap *OLMSnapshot) string {
-	if snap.CalibrationBias > 1.5 {
+	if snap.CalibrationBias > calibrationActionableThreshold {
 		return "Tu sur-estimes un peu tes acquis depuis 3 sessions — quelques exercices à froid t'aideront à recalibrer."
 	}
-	if snap.CalibrationBias < -1.5 {
+	if snap.CalibrationBias < -calibrationActionableThreshold {
 		return "Tu sous-estimes un peu tes acquis — tu en sais plus que tu crois."
 	}
 	if snap.AutonomyTrend == "declining" {
