@@ -110,6 +110,30 @@ func TestRecordSessionClose_EmptyIntentionFieldsSkipped(t *testing.T) {
 	}
 }
 
+func TestRecordSessionClose_InstructionMentionsOLM(t *testing.T) {
+	store, deps := setupToolsTest(t)
+	_ = makeOwnerDomain(t, store, "L_owner", "math")
+	res := callTool(t, deps, registerRecordSessionClose, "L_owner", "record_session_close", map[string]any{})
+	if res.IsError {
+		t.Fatalf("error: %q", resultText(res))
+	}
+	out := decodeResult(t, res)
+	recap, ok := out["recap_brief"].(map[string]any)
+	if !ok {
+		t.Fatalf("recap_brief missing or wrong shape: %+v", out)
+	}
+	instruction, _ := recap["instruction"].(string)
+	if !strings.Contains(instruction, "get_olm_snapshot") {
+		t.Errorf("instruction should mention get_olm_snapshot: %q", instruction)
+	}
+	if !strings.Contains(instruction, "olm:") {
+		t.Errorf("instruction should mention 'olm:' kind: %q", instruction)
+	}
+	if !strings.Contains(instruction, "13h") {
+		t.Errorf("instruction should mention 13h UTC dispatch: %q", instruction)
+	}
+}
+
 func TestMapKeysHelper(t *testing.T) {
 	if got := mapKeys(nil); len(got) != 0 {
 		t.Fatalf("expected empty for nil, got %v", got)

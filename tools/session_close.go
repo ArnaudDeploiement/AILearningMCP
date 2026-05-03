@@ -126,8 +126,11 @@ func buildRecapBrief(deps *Deps, learnerID string, domain *models.Domain) *model
 	instruction := "Clos la session en 2-3 phrases. Mentionne un win tangible ou une belle tentative. " +
 		"Si prompt_for_implementation_intention est vrai, pose une question concrete du type 'Quand et ou tu pratiques ensuite ?' " +
 		"et attends la reponse pour rappeler record_session_close avec implementation_intention. " +
-		"Puis appelle queue_webhook_message 2 fois (daily_motivation pour demain 8h UTC, daily_recap pour demain 21h UTC) " +
-		"avec un contenu chaleureux lie au personal_goal - sans KPI brut."
+		"Puis appelle get_olm_snapshot pour recuperer l'etat cognitif structure de l'apprenant, " +
+		"et appelle queue_webhook_message 3 fois : daily_motivation pour demain 8h UTC (chaleureux, lien au personal_goal) ; " +
+		"olm:<domain_id> pour demain 13h UTC (factuel — distribution + focus + UNE ligne metacog si active + progression vers le goal — pas de pep talk, le contenu doit COLLER au snapshot get_olm_snapshot) ; " +
+		"daily_recap pour demain 21h UTC (recap doux). " +
+		"Sans KPI brut."
 
 	return &models.RecapBrief{
 		ConceptsPracticed:             practiced,
