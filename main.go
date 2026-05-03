@@ -79,18 +79,6 @@ func main() {
 	}, &mcp.StreamableHTTPOptions{
 		DisableLocalhostProtection: true,
 		CrossOriginProtection:      cop,
-		// Stateless: claude.ai opens TWO MCP sessions per chat — one for the
-		// model loop (tools/call) and one for the AppBridge that backs the
-		// MCP App iframe (resources/read ui://cockpit). Without stateless
-		// mode the second session's Mcp-Session-Id is unknown to the server,
-		// the resource fetch returns 404, and the iframe falls back to
-		// "Impossible de joindre AI Learning". Stateless skips session
-		// validation; tool calls and resource reads each use a fresh
-		// short-lived session. We don't push server→client requests so the
-		// stateless trade-off is acceptable.
-		// Ref: anthropics/claude-ai-mcp#61, modelcontextprotocol/ext-apps#481
-		Stateless: true,
-		Logger:    logger,
 	})
 
 	// OAuth server
