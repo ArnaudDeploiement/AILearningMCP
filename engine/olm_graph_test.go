@@ -44,3 +44,20 @@ func TestMetacogLine_Exported(t *testing.T) {
 		t.Errorf("MetacogLine(no signal) = %q, want empty", got)
 	}
 }
+
+func TestOLMGraph_TypesCompile(t *testing.T) {
+	// Compile-time check via field reference: confirms struct shape.
+	g := &OLMGraph{
+		OLMSnapshot: &OLMSnapshot{DomainID: "d", DomainName: "n"},
+		Streak:      3,
+		Concepts: []GraphNode{
+			{Concept: "a", State: NodeSolid, PMastery: 0.9},
+		},
+		Edges: []GraphEdge{
+			{From: "a", To: "b", Type: EdgeFuture},
+		},
+	}
+	if g.DomainID != "d" || g.Streak != 3 || len(g.Concepts) != 1 || len(g.Edges) != 1 {
+		t.Errorf("unexpected shape: %+v", g)
+	}
+}
