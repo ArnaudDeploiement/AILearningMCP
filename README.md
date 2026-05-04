@@ -395,6 +395,27 @@ The figures below include a safety buffer (~50%) against the theoretical limits.
 - **robfig/cron** for background scheduling
 - **70 tests** covering algorithms, engine logic, motivation selection, misconception aggregation, and active-domain filtering
 
+## Pedagogical Validity — Current Status
+
+Tutor MCP ships a **synthetic-learner harness** (`eval/`) that replays
+each release against four pedagogical viability properties (V1–V4 :
+BKT calibration, ranking, routing-vs-random uplift, FSRS scheduling).
+The latest run is recorded in [`eval/VERDICT.md`](./eval/VERDICT.md).
+
+As of v0.2 (run 2026-05-03), the synthetic harness reports
+**NOT VIABLE — V1, V2, V3, V4 fail** at the bars set by the project
+itself, with V1′ (calibration on concepts seen ≥3 times) passing. The
+runtime closes ~72 % of the gap between random routing and the
+super-oracle on V3 (mean snapshot mastery uplift). Caveats from
+`eval/VERDICT.md` apply : synthetic learners only, no real-human data,
+borderline verdicts deserve bootstrap CI before being treated as
+final.
+
+This honest status is part of the project. The runtime is published
+as an open instrument — the methodology is reproducible, the bars are
+explicit, and the gap to viability is measurable. Real-human
+validation is the next chantier.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
