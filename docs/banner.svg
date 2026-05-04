@@ -68,13 +68,13 @@
   <g transform="translate(88 340)">
     <rect x="0" y="0" width="520" height="220" rx="18" ry="18"
           fill="rgba(255,255,255,0.72)" stroke="rgba(232,128,74,0.32)" stroke-width="1"/>
-    <text x="24" y="40" class="serif" font-size="18" fill="#c46a3c">cracker la pipeline RNA-seq</text>
-    <text x="24" y="86" class="sans" font-size="32" font-weight="600" fill="#1c1a18" letter-spacing="-0.5">Boucles for / while</text>
-    <text x="24" y="120" class="sans" font-size="14" fill="#5a5249">96 % de tes erreurs récentes touchent l'itération.</text>
-    <text x="24" y="142" class="sans" font-size="13" fill="#6a625d">P(maîtrise) 0.32  ·  Rétention 41 %  ·  3j sans révision</text>
+    <text x="24" y="40" class="serif" font-size="18" fill="#c46a3c">crack the RNA-seq pipeline</text>
+    <text x="24" y="86" class="sans" font-size="32" font-weight="600" fill="#1c1a18" letter-spacing="-0.5">for / while loops</text>
+    <text x="24" y="120" class="sans" font-size="14" fill="#5a5249">96% of your recent errors involve iteration.</text>
+    <text x="24" y="142" class="sans" font-size="13" fill="#6a625d">P(mastery) 0.32  ·  Retention 41%  ·  3d since review</text>
     <g transform="translate(24 165)">
       <rect x="0" y="0" width="130" height="36" rx="10" fill="url(#ctaFill)"/>
-      <text x="20" y="23" class="sans" font-size="14" font-weight="600" fill="#fff">j'attaque →</text>
+      <text x="20" y="23" class="sans" font-size="14" font-weight="600" fill="#fff">let's go →</text>
     </g>
   </g>
 
@@ -82,23 +82,23 @@
   <g transform="translate(720 340)" class="sans" font-size="13" fill="#1c1a18">
     <g>
       <circle cx="12" cy="26" r="6" fill="#e8804a"/>
-      <text x="32" y="30">Variables &amp; types · solide</text>
+      <text x="32" y="30">Variables &amp; types · solid</text>
     </g>
     <g transform="translate(0 36)">
       <circle cx="12" cy="26" r="6" fill="#f3a875"/>
-      <text x="32" y="30">Conditionnelles · en cours</text>
+      <text x="32" y="30">Conditionals · in progress</text>
     </g>
     <g transform="translate(0 72)">
       <circle cx="12" cy="26" r="6" fill="none" stroke="#c46a3c" stroke-width="1.5" stroke-dasharray="2 2"/>
-      <text x="32" y="30">Fonctions · fragile</text>
+      <text x="32" y="30">Functions · shaky</text>
     </g>
     <g transform="translate(0 108)">
       <circle cx="12" cy="26" r="6" fill="rgba(122,115,112,0.25)" stroke="rgba(122,115,112,0.3)"/>
-      <text x="32" y="30">Listes &amp; comprehensions</text>
+      <text x="32" y="30">Lists &amp; comprehensions</text>
     </g>
     <g transform="translate(0 144)">
       <circle cx="12" cy="26" r="6" fill="rgba(122,115,112,0.25)" stroke="rgba(122,115,112,0.3)"/>
-      <text x="32" y="30">Dictionnaires</text>
+      <text x="32" y="30">Dictionaries</text>
     </g>
   </g>
 </svg>
