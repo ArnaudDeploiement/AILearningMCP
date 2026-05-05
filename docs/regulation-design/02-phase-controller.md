@@ -1,5 +1,7 @@
 # [2] PhaseController — Design (Phase 1)
 
+> Voir aussi `docs/regulation-design/00-pipeline-vs-legacy.md` pour le mapping des 7 priorités du router legacy vers le pipeline orchestrateur (audit #15).
+
 > Composant 6/7 du pipeline de régulation. **L'orchestrateur** : porte
 > trois rôles distincts qui se composent — FSM des phases, runtime
 > coordinator du pipeline, layer de migration vis-à-vis du router
