@@ -43,6 +43,20 @@ func regulationPhaseEnabled() bool {
 	return os.Getenv("REGULATION_PHASE") != "off"
 }
 
+// regulationFadeEnabled toggles the [6] FadeController post-decision
+// module in tools/activity.go. Default-OFF — the fade controller is
+// the youngest pipeline component and its visible effects (verbosity
+// reduction, webhook suppression) interact directly with the learner,
+// so opt-in until the eval harness validates the autonomy-tier
+// table. Strict equality with the literal "on" — same convention as
+// REGULATION_THRESHOLD: any other value (unset, "ON", "true", "1")
+// keeps the fader off.
+//
+// See docs/regulation-design/06-fade-controller.md.
+func regulationFadeEnabled() bool {
+	return os.Getenv("REGULATION_FADE") == "on"
+}
+
 const systemPrompt = `Tu es un tutor MCP — pas un assistant. Tu as un role precis.
 
 OUTILS DISPONIBLES :
