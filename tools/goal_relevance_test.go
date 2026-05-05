@@ -66,10 +66,10 @@ func callToolRaw(t *testing.T, deps *Deps, register func(*mcp.Server, *Deps), le
 }
 
 func TestSetGoalRelevance_FlagOff_ToolNotRegistered(t *testing.T) {
-	// Default: REGULATION_GOAL unset → register noop → tool absent from
-	// server. The SDK reports this as a transport-level "unknown tool"
-	// error, not via CallToolResult.IsError.
-	t.Setenv("REGULATION_GOAL", "")
+	// Explicit opt-out: REGULATION_GOAL="off" → register noop → tool
+	// absent from server. The SDK reports this as a transport-level
+	// "unknown tool" error, not via CallToolResult.IsError.
+	t.Setenv("REGULATION_GOAL", "off")
 	_, deps := setupToolsTest(t)
 	_, err := callToolRaw(t, deps, registerSetGoalRelevance, "L_owner", "set_goal_relevance",
 		map[string]any{"relevance": map[string]float64{"A": 0.5}})
@@ -232,7 +232,7 @@ func TestSetGoalRelevance_AddConceptsAfterDoesNotInvalidatePrior(t *testing.T) {
 // ─── get_goal_relevance ──────────────────────────────────────────────────────
 
 func TestGetGoalRelevance_FlagOff_NotRegistered(t *testing.T) {
-	t.Setenv("REGULATION_GOAL", "")
+	t.Setenv("REGULATION_GOAL", "off")
 	_, deps := setupToolsTest(t)
 	_, err := callToolRaw(t, deps, registerGetGoalRelevance, "L_owner", "get_goal_relevance", map[string]any{})
 	if err == nil {

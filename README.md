@@ -10,7 +10,7 @@
 
 Under the hood, it provides real-time cognitive state tracking, spaced-repetition scheduling, intelligent activity routing, misconception diagnosis, a motivation layer, and a metacognitive loop that helps learners become autonomous — all exposed as a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that any MCP-compatible LLM can drive.
 
-> Current release: **v0.3** — adds the regulation pipeline (BKT-aware action selector, KST-aware concept selector, gate controller, and a pure-FSM phase orchestrator), all behind opt-in feature flags. The legacy router remains the default.
+> Current release: **v0.3** — adds the regulation pipeline (BKT-aware action selector, KST-aware concept selector, gate controller, and a pure-FSM phase orchestrator). Active by default; the legacy router remains available as a kill switch via `REGULATION_PHASE=off`.
 
 ## An Intelligent Tutoring System, not a chatbot
 
@@ -76,32 +76,34 @@ Five complementary learning-science algorithms run on every interaction and join
 
 ## Regulation Pipeline (v0.3, behind feature flags)
 
-On top of the legacy alert-and-router engine, v0.3 introduces a seven-stage **regulation pipeline** — pure functions composed by an impure orchestrator — that lifts activity selection from a priority-ladder of alerts to an explicit **phase FSM** (DIAGNOSTIC ↔ INSTRUCTION ↔ MAINTENANCE) with information-theoretic concept selection and a hygiene gate. Each stage is opt-in via its own environment variable; with all flags off, behaviour is byte-identical to v0.2.
+On top of the legacy alert-and-router engine, v0.3 introduces a seven-stage **regulation pipeline** — pure functions composed by an impure orchestrator — that lifts activity selection from a priority-ladder of alerts to an explicit **phase FSM** (DIAGNOSTIC ↔ INSTRUCTION ↔ MAINTENANCE) with information-theoretic concept selection and a hygiene gate. The pipeline is active by default; each stage exposes an opt-out flag for surgical rollback.
 
 | # | Stage | Status | What it does |
 |---|-------|--------|--------------|
-| **[7]** | Threshold Resolver (`algorithms/thresholds.go`) | **Shipped** (default-on) | Unifies the three historical mastery thresholds (BKT, KST gating, mid-curriculum) at 0.85. Opt-out: `REGULATION_THRESHOLD=off`. |
-| **[1]** | Goal Decomposer (`tools/goal_relevance.go`) | **Shipped** (opt-in) | LLM-authored relevance vector over the concept graph; biases [4] toward goal-critical concepts. Flag: `REGULATION_GOAL=on`. |
-| **[5]** | Action Selector (`engine/action_selector.go`) | **Shipped** (opt-in) | Picks the activity *type* for a chosen concept from BKT/IRT signals: `PRACTICE`, `DEBUG_MISCONCEPTION`, `FEYNMAN_PROMPT`, `TRANSFER_PROBE`, `RECALL_EXERCISE`, `MASTERY_CHALLENGE`. ZPD anchored at `IRT_θ + 0.847`. Flag: `REGULATION_ACTION=on`. |
-| **[4]** | Concept Selector (`engine/concept_selector.go`) | **Shipped** (opt-in) | Phase-aware concept choice: max-info-gain on the KST fringe (INSTRUCTION), most-overdue under FSRS (MAINTENANCE), max-binary-entropy untouched concept (DIAGNOSTIC). Flag: `REGULATION_CONCEPT=on`. |
-| **[3]** | Gate Controller (`engine/gate.go`) | **Shipped** (opt-in) | Hygiene gate that may override the selection: anti-repeat window (no concept repeated within last *N*=3 activities), 45-min session-budget escape (`CLOSE_SESSION`), no-fringe escape (`REST`). Flag: `REGULATION_GATE=on`. |
-| **[2]** | Phase Controller (`engine/orchestrator.go` + `engine/phase_fsm.go`) | **Shipped** (opt-in) | Pure-FSM orchestrator wiring [4]→[5]→[3]. Transitions are observation-driven: DIAGNOSTIC→INSTRUCTION on entropy reduction *ΔH ≥ 0.2 bits* or *N ≥ 8* diagnostic items; INSTRUCTION→MAINTENANCE on full-graph mastery; MAINTENANCE→INSTRUCTION on FSRS retention drop. Flag: `REGULATION_PHASE=on`. |
+| **[7]** | Threshold Resolver (`algorithms/thresholds.go`) | **Shipped** (default-on) | Unifies the three historical mastery thresholds (BKT, KST gating, mid-curriculum) at 0.85. Kill switch: `REGULATION_THRESHOLD=off`. |
+| **[1]** | Goal Decomposer (`tools/goal_relevance.go`) | **Shipped** (default-on) | LLM-authored relevance vector over the concept graph; biases [4] toward goal-critical concepts. Kill switch: `REGULATION_GOAL=off`. |
+| **[5]** | Action Selector (`engine/action_selector.go`) | **Shipped** (default-on) | Picks the activity *type* for a chosen concept from BKT/IRT signals: `PRACTICE`, `DEBUG_MISCONCEPTION`, `FEYNMAN_PROMPT`, `TRANSFER_PROBE`, `RECALL_EXERCISE`, `MASTERY_CHALLENGE`. ZPD anchored at `IRT_θ + 0.847`. Kill switch: `REGULATION_ACTION=off` (drops only the system-prompt appendix; `REGULATION_PHASE=off` is what disables the runtime). |
+| **[4]** | Concept Selector (`engine/concept_selector.go`) | **Shipped** (default-on) | Phase-aware concept choice: max-info-gain on the KST fringe (INSTRUCTION), most-overdue under FSRS (MAINTENANCE), max-binary-entropy untouched concept (DIAGNOSTIC). Kill switch: `REGULATION_CONCEPT=off` (prompt appendix only; same caveat). |
+| **[3]** | Gate Controller (`engine/gate.go`) | **Shipped** (default-on) | Hygiene gate that may override the selection: anti-repeat window (no concept repeated within last *N*=3 activities), 45-min session-budget escape (`CLOSE_SESSION`), no-fringe escape (`REST`). Kill switch: `REGULATION_GATE=off` (prompt appendix only). |
+| **[2]** | Phase Controller (`engine/orchestrator.go` + `engine/phase_fsm.go`) | **Shipped** (default-on) | Pure-FSM orchestrator wiring [4]→[5]→[3]. Transitions are observation-driven: DIAGNOSTIC→INSTRUCTION on entropy reduction *ΔH ≥ 0.2 bits* or *N ≥ 8* diagnostic items; INSTRUCTION→MAINTENANCE on full-graph mastery; MAINTENANCE→INSTRUCTION on FSRS retention drop. Kill switch: `REGULATION_PHASE=off` falls back to legacy `engine.Route`. |
 | **[6]** | Fade Controller | **Pending** | Gradual handover of pacing decisions to the learner once autonomy thresholds are met. Not implemented yet. |
 
 The pure functions (`SelectAction`, `SelectConcept`, `ApplyGate`, `EvaluatePhase`) are individually unit-tested (~90 dedicated tests). The orchestrator is exercised by SQLite in-memory tests and migration safety tests for the new `domains.phase`, `domains.phase_changed_at`, `domains.phase_entry_entropy` columns.
 
-### Feature flags — strict-equality opt-in
+### Feature flags — default-on, opt-out via `=off`
 
-All regulation flags default OFF and use **strict literal equality** (`"on"`) to enable, except `REGULATION_THRESHOLD` which is on by default and uses `"off"` to opt out. Typos (`On`, `ON`, ` on`) are treated as the safe default — operators must type the canonical value exactly. This prevents accidental enablement and makes rollback unambiguous.
+All regulation flags are **active by default**. Setting any of them to the literal `off` disables that stage; any other value (including unset) leaves it enabled. Typos in the off-direction (`Off`, `OFF`, ` off`) leave the stage active — operators must type `off` exactly to disable, which makes accidental rollback impossible.
 
-| Flag | Default | Effect when set |
-|------|---------|-----------------|
-| `REGULATION_THRESHOLD` | **on** (opt-out: `=off`) | Unified 0.85 mastery threshold across BKT/KST/mid-curriculum. |
-| `REGULATION_GOAL=on` | off | Exposes `set_goal_relevance` / `get_goal_relevance` and appends the goal-aware system-prompt section. |
-| `REGULATION_ACTION=on` | off | Appends the action-selector system-prompt section (LLM is told the new activity types may appear). |
-| `REGULATION_CONCEPT=on` | off | Appends the concept-selector system-prompt section. |
-| `REGULATION_GATE=on` | off | Appends the gate system-prompt section (documents `CLOSE_SESSION` semantics). |
-| `REGULATION_PHASE=on` | off | Routes `get_next_activity` through the orchestrator; falls back to legacy `engine.Route` on orchestrator error. |
+Only two flags change the runtime; the rest control the system-prompt appendix only. The appendix tells the LLM about the new activity types and routing semantics, but the actual selection logic ships behind `REGULATION_PHASE`.
+
+| Flag | Default | Effect when set to `off` | Touches |
+|------|---------|--------------------------|---------|
+| `REGULATION_THRESHOLD` | on | Reverts to legacy split thresholds (BKT 0.85, KST 0.70, Mid 0.80). | runtime |
+| `REGULATION_PHASE` | on | Routes `get_next_activity` through the legacy `engine.Route` priority cascade instead of `engine.Orchestrate`. The orchestrator already auto-falls-back to legacy on internal error; this flag is the explicit operator override. | runtime |
+| `REGULATION_GOAL` | on | Hides `set_goal_relevance` / `get_goal_relevance` from the MCP tool list and drops the goal-aware system-prompt section. | runtime + prompt |
+| `REGULATION_ACTION` | on | Drops the action-selector appendix (the LLM no longer sees the new activity types documented). The selector itself keeps running under `REGULATION_PHASE`. | prompt only |
+| `REGULATION_CONCEPT` | on | Drops the concept-selector appendix. Selector keeps running. | prompt only |
+| `REGULATION_GATE` | on | Drops the gate appendix. Gate keeps running. | prompt only |
 
 ## MCP Tools (30)
 
@@ -130,8 +132,8 @@ All regulation flags default OFF and use **strict literal equality** (`"on"`) to
 | `archive_domain` | Hide a domain from cockpit/routing while preserving progress |
 | `unarchive_domain` | Reactivate an archived domain |
 | `delete_domain` | Permanently remove a domain and all its data |
-| `set_goal_relevance` *(flag-gated, `REGULATION_GOAL=on`)* | LLM-decomposed goal-relevance vector over the concept graph (0 = orthogonal, 1 = goal-critical) — biases the concept selector toward what matters for the learner's stated objective |
-| `get_goal_relevance` *(flag-gated, `REGULATION_GOAL=on`)* | Read current goal-relevance vector with staleness flags (graph-version drift, uncovered concepts) |
+| `set_goal_relevance` | LLM-decomposed goal-relevance vector over the concept graph (0 = orthogonal, 1 = goal-critical) — biases the concept selector toward what matters for the learner's stated objective. Disabled by `REGULATION_GOAL=off`. |
+| `get_goal_relevance` | Read current goal-relevance vector with staleness flags (graph-version drift, uncovered concepts). Disabled by `REGULATION_GOAL=off`. |
 
 ### Metacognitive Loop
 

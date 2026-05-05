@@ -12,34 +12,35 @@ import (
 )
 
 // regulationActionEnabled gates the action-selector documentation
-// appendix. Strict equality opt-in (cf. regulationGoalEnabled): only
-// the literal "on" turns it on, preventing typo-driven activation.
+// appendix. Default-on, opt-out only via the literal "off" — same
+// convention as REGULATION_THRESHOLD. The pipeline ships active; the
+// flag exists as a kill switch for emergency rollback.
 func regulationActionEnabled() bool {
-	return os.Getenv("REGULATION_ACTION") == "on"
+	return os.Getenv("REGULATION_ACTION") != "off"
 }
 
 // regulationConceptEnabled gates the concept-selector documentation
-// appendix. Strict equality opt-in (same pattern as the other
-// regulation flags).
+// appendix. Default-on, opt-out via "off".
 func regulationConceptEnabled() bool {
-	return os.Getenv("REGULATION_CONCEPT") == "on"
+	return os.Getenv("REGULATION_CONCEPT") != "off"
 }
 
 // regulationGateEnabled gates the gate-controller documentation
-// appendix.
+// appendix. Default-on, opt-out via "off".
 func regulationGateEnabled() bool {
-	return os.Getenv("REGULATION_GATE") == "on"
+	return os.Getenv("REGULATION_GATE") != "off"
 }
 
 // regulationPhaseEnabled toggles the [2] PhaseController orchestrator
-// in tools/activity.go. When "on", get_next_activity routes through
-// engine.Orchestrate (FSM + Gate → ConceptSelector → ActionSelector);
-// otherwise the legacy engine.Route remains in charge (backward-compat).
-//
-// Strict equality opt-in (cohérent avec les autres flags REGULATION_*)
-// — typos like "ON", " on", "1" do NOT activate the orchestrator.
+// in tools/activity.go. Default-on: get_next_activity routes through
+// engine.Orchestrate (FSM + Gate → ConceptSelector → ActionSelector).
+// Opt-out via REGULATION_PHASE=off — the legacy engine.Route remains
+// available as a kill switch for rollback. The orchestrator already
+// falls back to the legacy router automatically when it returns an
+// error (tools/activity.go); the flag is for explicit operator
+// override.
 func regulationPhaseEnabled() bool {
-	return os.Getenv("REGULATION_PHASE") == "on"
+	return os.Getenv("REGULATION_PHASE") != "off"
 }
 
 const systemPrompt = `Tu es un tutor MCP — pas un assistant. Tu as un role precis.

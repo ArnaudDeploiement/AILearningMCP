@@ -22,11 +22,10 @@ import (
 )
 
 // regulationGoalEnabled gates registration and execution of both
-// set_goal_relevance and get_goal_relevance. Strict equality on "on"
-// matches the conventions of [7]'s REGULATION_THRESHOLD: typos do not
-// activate the feature.
+// set_goal_relevance and get_goal_relevance. Default-on, opt-out via
+// REGULATION_GOAL=off — same convention as REGULATION_THRESHOLD.
 func regulationGoalEnabled() bool {
-	return os.Getenv("REGULATION_GOAL") == "on"
+	return os.Getenv("REGULATION_GOAL") != "off"
 }
 
 const (
