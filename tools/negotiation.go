@@ -18,7 +18,7 @@ import (
 
 type LearningNegotiationParams struct {
 	SessionID        string `json:"session_id" jsonschema:"ID de la session courante"`
-	LearnerConcept   string `json:"learner_concept,omitempty" jsonschema:"Concept propose par l'apprenant (optionnel)"`
+	LearnerConcept   string `json:"learner_concept,omitempty" jsonschema:"Concept proposé par l'apprenant (optionnel)"`
 	LearnerRationale string `json:"learner_rationale,omitempty" jsonschema:"Justification de l'apprenant (optionnel)"`
 	DomainID         string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
 }
@@ -33,7 +33,7 @@ type tradeoff struct {
 func registerLearningNegotiation(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "learning_negotiation",
-		Description: "Expose le plan de session avec justifications. L'apprenant peut proposer une alternative — le systeme accepte ou explique les compromis.",
+		Description: "Expose le plan de session avec justifications. L'apprenant peut proposer une alternative — le système accepte ou explique les compromis.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params LearningNegotiationParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

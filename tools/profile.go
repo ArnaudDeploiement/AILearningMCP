@@ -14,20 +14,20 @@ import (
 
 type UpdateLearnerProfileParams struct {
 	Device          string  `json:"device,omitempty" jsonschema:"Appareil principal (ex: laptop, phone, tablet)"`
-	Background      string  `json:"background,omitempty" jsonschema:"Contexte professionnel ou academique de l'apprenant"`
-	Style           string  `json:"learning_style,omitempty" jsonschema:"Style d'apprentissage prefere (ex: visuel, pratique, theorique)"`
-	Objective       string  `json:"objective,omitempty" jsonschema:"Objectif d'apprentissage mis a jour"`
-	Language        string  `json:"language,omitempty" jsonschema:"Langue preferee pour les exercices"`
-	Level           string  `json:"level,omitempty" jsonschema:"Niveau actuel (debutant, intermediaire, avance)"`
-	CalibrationBias float64 `json:"calibration_bias,omitempty" jsonschema:"Biais de calibration (positif=sur-estime, negatif=sous-estime)"`
-	AffectBaseline  string  `json:"affect_baseline,omitempty" jsonschema:"Baseline emotionnelle de l'apprenant"`
+	Background      string  `json:"background,omitempty" jsonschema:"Contexte professionnel ou académique de l'apprenant"`
+	Style           string  `json:"learning_style,omitempty" jsonschema:"Style d'apprentissage préféré (ex: visuel, pratique, théorique)"`
+	Objective       string  `json:"objective,omitempty" jsonschema:"Objectif d'apprentissage mis à jour"`
+	Language        string  `json:"language,omitempty" jsonschema:"Langue préférée pour les exercices"`
+	Level           string  `json:"level,omitempty" jsonschema:"Niveau actuel (débutant, intermédiaire, avancé)"`
+	CalibrationBias float64 `json:"calibration_bias,omitempty" jsonschema:"Biais de calibration (positif=sur-estimé, négatif=sous-estimé)"`
+	AffectBaseline  string  `json:"affect_baseline,omitempty" jsonschema:"Baseline émotionnelle de l'apprenant"`
 	AutonomyScore   float64 `json:"autonomy_score,omitempty" jsonschema:"Score d'autonomie actuel (0-1)"`
 }
 
 func registerUpdateLearnerProfile(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_learner_profile",
-		Description: "Met a jour les metadonnees persistantes de l'apprenant (device, background, style, objectif, niveau). Seuls les champs fournis sont modifies.",
+		Description: "Met à jour les métadonnées persistantes de l'apprenant (device, background, style, objectif, niveau). Seuls les champs fournis sont modifiés.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params UpdateLearnerProfileParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

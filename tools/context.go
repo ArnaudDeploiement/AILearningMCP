@@ -18,13 +18,13 @@ import (
 )
 
 type GetLearnerContextParams struct {
-	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilise le dernier domaine si absent)"`
+	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilisé le dernier domaine si absent)"`
 }
 
 func registerGetLearnerContext(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_learner_context",
-		Description: "Recupere le contexte complet de l'apprenant pour le debut de session.",
+		Description: "Récupère le contexte complet de l'apprenant pour le début de session.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetLearnerContextParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

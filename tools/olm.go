@@ -12,14 +12,14 @@ import (
 )
 
 type GetOLMSnapshotParams struct {
-	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilise le dernier domaine actif si absent)"`
-	Scope    string `json:"scope,omitempty" jsonschema:"'session' (defaut, snapshot d'un domaine), 'global' (agregation multi-domaine), ou 'graph' (OLMGraph complet d'un domaine — utilise par le cockpit pour switcher entre domaines actifs)"`
+	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilisé le dernier domaine actif si absent)"`
+	Scope    string `json:"scope,omitempty" jsonschema:"'session' (défaut, snapshot d'un domaine), 'global' (agrégation multi-domaine), ou 'graph' (OLMGraph complet d'un domaine — utilisé par le cockpit pour switcher entre domaines actifs)"`
 }
 
 func registerGetOLMSnapshot(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_olm_snapshot",
-		Description: "Retourne un snapshot transparent de l'etat d'apprentissage : distribution mastery, concept en focus, signaux metacognitifs actifs, progression vers le goal. Apprenant et tuteur regardent les memes donnees. Appeler avant queue_webhook_message(kind='olm:<domain_id>') ou pour reflet metacognitif en session.",
+		Description: "Retourne un snapshot transparent de l'état d'apprentissage : distribution mastery, concept en focus, signaux métacognitifs actifs, progression vers le goal. Apprenant et tuteur regardent les mêmes données. Appeler avant queue_webhook_message(kind='olm:<domain_id>') ou pour reflet métacognitif en session.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetOLMSnapshotParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

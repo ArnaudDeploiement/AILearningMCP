@@ -17,17 +17,17 @@ import (
 
 type RecordAffectParams struct {
 	SessionID           string `json:"session_id" jsonschema:"Identifiant unique de la session"`
-	Energy              int    `json:"energy,omitempty" jsonschema:"Energie disponible: 1=fatigue, 2=neutre, 3=motive, 4=en feu"`
+	Energy              int    `json:"energy,omitempty" jsonschema:"Énergie disponible: 1=fatigué, 2=neutre, 3=motivé, 4=en feu"`
 	Confidence          int    `json:"confidence,omitempty" jsonschema:"Confiance sur le sujet: 1=anxieux, 2=flou, 3=ok, 4=confiant"`
 	Satisfaction        int    `json:"satisfaction,omitempty" jsonschema:"Ressenti global (fin de session): 1=frustrant, 2=difficile, 3=bien, 4=flow"`
-	PerceivedDifficulty int    `json:"perceived_difficulty,omitempty" jsonschema:"Difficulte percue (fin de session): 1=trop dur, 2=challengeant, 3=ok, 4=trop facile"`
+	PerceivedDifficulty int    `json:"perceived_difficulty,omitempty" jsonschema:"Difficulté perçue (fin de session): 1=trop dur, 2=challengeant, 3=ok, 4=trop facile"`
 	NextSessionIntent   int    `json:"next_session_intent,omitempty" jsonschema:"Prochaine session: 1=maintenant, 2=demain, 3=cette semaine, 4=je sais pas"`
 }
 
 func registerRecordAffect(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "record_affect",
-		Description: "Enregistre l'etat emotionnel de l'apprenant. Appeler en debut de session (energy, confidence) et en fin (satisfaction, perceived_difficulty, next_session_intent).",
+		Description: "Enregistre l'état émotionnel de l'apprenant. Appeler en début de session (energy, confidence) et en fin (satisfaction, perceived_difficulty, next_session_intent).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordAffectParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

@@ -14,14 +14,14 @@ import (
 )
 
 type CheckMasteryParams struct {
-	Concept  string `json:"concept" jsonschema:"Le concept a verifier pour la maitrise"`
+	Concept  string `json:"concept" jsonschema:"Le concept à vérifier pour la maîtrise"`
 	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
 }
 
 func registerCheckMastery(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "check_mastery",
-		Description: "Verifie si un concept est pret pour le mastery challenge (BKT >= 0.85).",
+		Description: "Vérifie si un concept est prêt pour le mastery challenge (BKT >= 0.85).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params CheckMasteryParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

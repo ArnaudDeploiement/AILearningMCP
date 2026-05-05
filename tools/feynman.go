@@ -14,14 +14,14 @@ import (
 )
 
 type FeynmanChallengeParams struct {
-	ConceptID string `json:"concept_id" jsonschema:"Le concept a expliquer avec la methode Feynman"`
+	ConceptID string `json:"concept_id" jsonschema:"Le concept à expliquer avec la méthode Feynman"`
 	DomainID  string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
 }
 
 func registerFeynmanChallenge(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "feynman_challenge",
-		Description: "Demande a l'apprenant d'expliquer un concept maitrise avec ses propres mots. Le LLM identifie les gaps et les injecte dans le graphe BKT.",
+		Description: "Demande à l'apprenant d'expliquer un concept maîtrisé avec ses propres mots. Le LLM identifie les gaps et les injecte dans le graphe BKT.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params FeynmanChallengeParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

@@ -16,15 +16,15 @@ import (
 )
 
 type CalibrationCheckParams struct {
-	ConceptID        string  `json:"concept_id" jsonschema:"Le concept a evaluer"`
-	PredictedMastery float64 `json:"predicted_mastery" jsonschema:"Auto-evaluation de l'apprenant: 1=aucune maitrise, 5=maitrise parfaite"`
+	ConceptID        string  `json:"concept_id" jsonschema:"Le concept à évaluer"`
+	PredictedMastery float64 `json:"predicted_mastery" jsonschema:"Auto-évaluation de l'apprenant: 1=aucune maîtrise, 5=maîtrise parfaite"`
 	DomainID         string  `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
 }
 
 func registerCalibrationCheck(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "calibration_check",
-		Description: "Enregistre l'auto-evaluation de l'apprenant sur un concept avant un exercice. Retourne un prediction_id pour comparaison post-exercice.",
+		Description: "Enregistre l'auto-évaluation de l'apprenant sur un concept avant un exercice. Retourne un prediction_id pour comparaison post-exercice.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params CalibrationCheckParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
@@ -61,7 +61,7 @@ func registerCalibrationCheck(server *mcp.Server, deps *Deps) {
 		}
 
 		promptText := fmt.Sprintf(
-			"Tu as estime ta maitrise de '%s' a %.0f/5. Voyons ca avec un exercice.",
+			"Tu as estimé ta maîtrise de '%s' à %.0f/5. Voyons ça avec un exercice.",
 			params.ConceptID, params.PredictedMastery,
 		)
 
@@ -74,14 +74,14 @@ func registerCalibrationCheck(server *mcp.Server, deps *Deps) {
 }
 
 type RecordCalibrationResultParams struct {
-	PredictionID string  `json:"prediction_id" jsonschema:"ID de la prediction retournee par calibration_check"`
-	ActualScore  float64 `json:"actual_score" jsonschema:"Score reel entre 0 et 1 (0=echec total, 1=reussite parfaite)"`
+	PredictionID string  `json:"prediction_id" jsonschema:"ID de la prédiction retournée par calibration_check"`
+	ActualScore  float64 `json:"actual_score" jsonschema:"Score réel entre 0 et 1 (0=échec total, 1=réussite parfaite)"`
 }
 
 func registerRecordCalibrationResult(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "record_calibration_result",
-		Description: "Compare la prediction de l'apprenant avec le resultat reel. Met a jour le biais de calibration.",
+		Description: "Compare la prédiction de l'apprenant avec le résultat réel. Met à jour le biais de calibration.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordCalibrationResultParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

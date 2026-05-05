@@ -24,7 +24,7 @@ func TestGetCockpitState_NoAuth(t *testing.T) {
 func TestGetCockpitState_NoDomain(t *testing.T) {
 	_, deps := setupToolsTest(t)
 	res := callTool(t, deps, registerGetCockpitState, "L_owner", "get_cockpit_state", map[string]any{})
-	if !res.IsError || !strings.Contains(resultText(res), "aucun domaine configure") {
+	if !res.IsError || !strings.Contains(resultText(res), "aucun domaine configuré") {
 		t.Fatalf("got %q", resultText(res))
 	}
 }

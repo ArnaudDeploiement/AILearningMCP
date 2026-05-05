@@ -20,7 +20,7 @@ type GetMetacognitiveMirrorParams struct {
 func registerGetMetacognitiveMirror(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_metacognitive_mirror",
-		Description: "Retourne un message miroir factuel si un pattern de dependance est consolide. Null sinon.",
+		Description: "Retourne un message miroir factuel si un pattern de dépendance est consolidé. Null sinon.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetMetacognitiveMirrorParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

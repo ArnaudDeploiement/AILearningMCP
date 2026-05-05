@@ -15,8 +15,8 @@ import (
 )
 
 type ImplementationIntentionInput struct {
-	Trigger      string `json:"trigger" jsonschema:"Clause 'quand' (ex: 'demain matin au cafe')"`
-	Action       string `json:"action" jsonschema:"Clause 'alors je' (ex: 'ferai 1 exercice de derivees')"`
+	Trigger      string `json:"trigger" jsonschema:"Clause 'quand' (ex: 'demain matin au café')"`
+	Action       string `json:"action" jsonschema:"Clause 'alors je' (ex: 'ferai 1 exercice de dérivées')"`
 	ScheduledFor string `json:"scheduled_for,omitempty" jsonschema:"ISO 8601 timestamp optionnel (UTC)"`
 }
 
@@ -28,7 +28,7 @@ type RecordSessionCloseParams struct {
 func registerRecordSessionClose(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "record_session_close",
-		Description: "Cloture la session : enregistre optionnellement une implementation intention (if-then) et retourne des signaux structures pour composer le message de fin (concepts pratiques, wins, intent prompt, message queue filler).",
+		Description: "Clôture la session : enregistre optionnellement une implementation intention (if-then) et retourne des signaux structurés pour composer le message de fin (concepts pratiqués, wins, intent prompt, message queue filler).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordSessionCloseParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
@@ -124,11 +124,11 @@ func buildRecapBrief(deps *Deps, learnerID string, domain *models.Domain) *model
 	promptIntent := !has
 
 	instruction := "Clos la session en 2-3 phrases. Mentionne un win tangible ou une belle tentative. " +
-		"Si prompt_for_implementation_intention est vrai, pose une question concrete du type 'Quand et ou tu pratiques ensuite ?' " +
-		"et attends la reponse pour rappeler record_session_close avec implementation_intention. " +
-		"Puis appelle get_olm_snapshot pour recuperer l'etat cognitif structure de l'apprenant, " +
+		"Si prompt_for_implementation_intention est vrai, pose une question concrète du type 'Quand et où tu pratiques ensuite ?' " +
+		"et attends la réponse pour rappeler record_session_close avec implementation_intention. " +
+		"Puis appelle get_olm_snapshot pour récupérer l'état cognitif structuré de l'apprenant, " +
 		"et appelle queue_webhook_message 3 fois : daily_motivation pour demain 8h UTC (chaleureux, lien au personal_goal) ; " +
-		"olm:<domain_id> pour demain 13h UTC (factuel — distribution + focus + UNE ligne metacog si active + progression vers le goal — pas de pep talk, le contenu doit COLLER au snapshot get_olm_snapshot) ; " +
+		"olm:<domain_id> pour demain 13h UTC (factuel — distribution + focus + UNE ligne métacog si active + progression vers le goal — pas de pep talk, le contenu doit COLLER au snapshot get_olm_snapshot) ; " +
 		"daily_recap pour demain 21h UTC (recap doux). " +
 		"Sans KPI brut."
 

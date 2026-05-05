@@ -19,7 +19,7 @@ type GetAvailabilityModelParams struct{}
 func registerGetAvailabilityModel(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_availability_model",
-		Description: "Recupere le modele de disponibilite de l'apprenant (creneaux, duree moyenne, frequence).",
+		Description: "Récupère le modèle de disponibilité de l'apprenant (créneaux, durée moyenne, fréquence).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetAvailabilityModelParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

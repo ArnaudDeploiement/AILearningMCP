@@ -14,13 +14,13 @@ import (
 )
 
 type GetPendingAlertsParams struct {
-	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilise le dernier domaine si absent)"`
+	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilisé le dernier domaine si absent)"`
 }
 
 func registerGetPendingAlerts(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_pending_alerts",
-		Description: "Recupere les alertes en attente pour l'apprenant. Appeler en premier a chaque reponse.",
+		Description: "Récupère les alertes en attente pour l'apprenant. Appeler en premier à chaque réponse.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetPendingAlertsParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

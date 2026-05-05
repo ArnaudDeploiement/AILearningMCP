@@ -37,7 +37,7 @@ func cockpitUIMeta() mcp.Meta {
 
 type GetCockpitStateParams struct {
 	DomainID        string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel). Si absent, affiche tous les domaines actifs."`
-	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"Si true, inclut les domaines archives dans la reponse."`
+	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"Si true, inclut les domaines archivés dans la réponse."`
 }
 
 type conceptProgress struct {
@@ -63,7 +63,7 @@ type domainCockpit struct {
 func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_cockpit_state",
-		Description: "Retourne l'etat brut du cockpit en JSON (progression par concept, alertes, signaux, prochaine action). USAGE PROGRAMMATIQUE — scripts d'eval, reporting. NE PAS UTILISER quand l'apprenant demande d'ouvrir/voir/afficher son cockpit : utiliser open_cockpit qui rend une UI native.",
+		Description: "Retourne l'état brut du cockpit en JSON (progression par concept, alertes, signaux, prochaine action). USAGE PROGRAMMATIQUE — scripts d'éval, reporting. NE PAS UTILISER quand l'apprenant demande d'ouvrir/voir/afficher son cockpit : utiliser open_cockpit qui rend une UI native.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetCockpitStateParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
@@ -100,11 +100,11 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 			allDomains, err := deps.Store.GetDomainsByLearner(learnerID, params.IncludeArchived)
 			if err != nil {
 				deps.Logger.Error("get_cockpit_state: failed to get domains", "err", err, "learner", learnerID)
-				r, _ := errorResult("aucun domaine configure")
+				r, _ := errorResult("aucun domaine configuré")
 				return r, nil, nil
 			}
 			if len(allDomains) == 0 {
-				r, _ := errorResult("aucun domaine configure")
+				r, _ := errorResult("aucun domaine configuré")
 				return r, nil, nil
 			}
 			domains = allDomains
@@ -178,7 +178,7 @@ func registerGetCockpitState(server *mcp.Server, deps *Deps) {
 
 			// Next action for this domain
 			frontier := algorithms.ComputeFrontier(graph, mastery)
-			nextAction := "continuer la revision"
+			nextAction := "continuer la révision"
 			if len(frontier) > 0 {
 				nextAction = fmt.Sprintf("nouveau concept: %s", frontier[0])
 			}

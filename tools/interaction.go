@@ -16,25 +16,25 @@ import (
 )
 
 type RecordInteractionParams struct {
-	Concept             string  `json:"concept" jsonschema:"Le concept concerne"`
-	ActivityType        string  `json:"activity_type" jsonschema:"Type d'activite (RECALL_EXERCISE, NEW_CONCEPT, etc.)"`
-	Success             bool    `json:"success" jsonschema:"L'exercice a ete reussi"`
-	ResponseTimeSeconds float64 `json:"response_time_seconds" jsonschema:"Temps de reponse en secondes"`
-	Confidence          float64 `json:"confidence" jsonschema:"Confiance estimee entre 0 et 1"`
-	ErrorType           string  `json:"error_type,omitempty" jsonschema:"Type d'erreur si echec: SYNTAX_ERROR, LOGIC_ERROR, KNOWLEDGE_GAP (optionnel)"`
+	Concept             string  `json:"concept" jsonschema:"Le concept concerné"`
+	ActivityType        string  `json:"activity_type" jsonschema:"Type d'activité (RECALL_EXERCISE, NEW_CONCEPT, etc.)"`
+	Success             bool    `json:"success" jsonschema:"L'exercice a été réussi"`
+	ResponseTimeSeconds float64 `json:"response_time_seconds" jsonschema:"Temps de réponse en secondes"`
+	Confidence          float64 `json:"confidence" jsonschema:"Confiance estimée entre 0 et 1"`
+	ErrorType           string  `json:"error_type,omitempty" jsonschema:"Type d'erreur si échec: SYNTAX_ERROR, LOGIC_ERROR, KNOWLEDGE_GAP (optionnel)"`
 	Notes               string  `json:"notes" jsonschema:"Notes optionnelles sur l'interaction"`
 	DomainID            string  `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel)"`
-	HintsRequested      int     `json:"hints_requested,omitempty" jsonschema:"Nombre d'indices demandes pendant l'echange (optionnel, defaut 0)"`
-	SelfInitiated       bool    `json:"self_initiated,omitempty" jsonschema:"true si la session a demarre sans alerte webhook"`
-	CalibrationID       string  `json:"calibration_id,omitempty" jsonschema:"ID de la prediction de calibration associee (optionnel)"`
-	MisconceptionType   string  `json:"misconception_type,omitempty" jsonschema:"Label libre de la misconception detectee (optionnel, ignore si success=true)"`
+	HintsRequested      int     `json:"hints_requested,omitempty" jsonschema:"Nombre d'indices demandés pendant l'échange (optionnel, défaut 0)"`
+	SelfInitiated       bool    `json:"self_initiated,omitempty" jsonschema:"true si la session a démarré sans alerte webhook"`
+	CalibrationID       string  `json:"calibration_id,omitempty" jsonschema:"ID de la prédiction de calibration associée (optionnel)"`
+	MisconceptionType   string  `json:"misconception_type,omitempty" jsonschema:"Label libre de la misconception détectée (optionnel, ignoré si success=true)"`
 	MisconceptionDetail string  `json:"misconception_detail,omitempty" jsonschema:"Description de la misconception en une phrase (optionnel)"`
 }
 
 func registerRecordInteraction(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "record_interaction",
-		Description: "Enregistre le resultat d'un exercice et met a jour l'etat cognitif de l'apprenant. Supporte error_type pour ajuster le BKT selon le type d'erreur.",
+		Description: "Enregistre le résultat d'un exercice et met à jour l'état cognitif de l'apprenant. Supporte error_type pour ajuster le BKT selon le type d'erreur.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params RecordInteractionParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {

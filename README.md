@@ -278,6 +278,32 @@ main.go              HTTP server, MCP handler, OAuth, scheduler startup
 └── tools/                30 MCP tool handlers + system prompt + flag-gated appendices
 ```
 
+## Language conventions
+
+The codebase mixes English and French on purpose. The split is along a single
+axis: **who reads the string?**
+
+- **English** — everything developers and operators read: source code,
+  identifiers, comments, log messages, error returns surfaced to clients/CI,
+  this README and every doc under `docs/`. Keep `slog` calls, panics, and Go
+  errors in English.
+- **French** — everything the **learner** ends up seeing, directly or via the
+  LLM's routing/prompting layer:
+  - MCP tool descriptions and `jsonschema` parameter descriptions
+    (`tools/*.go`) — the LLM uses these to choose which tool to call, and
+    paraphrases them back to the learner.
+  - The system prompt (`tools/prompt.go`).
+  - OLM (open learner model) messages (`engine/olm.go`).
+  - Rationales the orchestrator surfaces to the learner
+    (`engine/orchestrator.go`).
+  - DB-stored literal strings that flow through to learner-facing UI
+    (`db/store.go`).
+
+When in doubt: if a string is destined for the learner, write it in correct
+French with full diacritics (`é`, `è`, `à`, `ç`, `ô`, `î`, …). The lint test
+in `tools/registration_test.go` enforces diacritic consistency across tool
+descriptions; widen it if you add new learner-facing surfaces.
+
 ## Running
 
 ### Setup workflow

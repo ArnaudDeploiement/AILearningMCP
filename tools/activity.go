@@ -17,13 +17,13 @@ import (
 )
 
 type GetNextActivityParams struct {
-	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilise le dernier domaine si absent)"`
+	DomainID string `json:"domain_id,omitempty" jsonschema:"ID du domaine (optionnel, utilisé le dernier domaine si absent)"`
 }
 
 func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_next_activity",
-		Description: "Determine la prochaine activite optimale pour l'apprenant selon son etat cognitif. Tient compte de la session en cours pour eviter de repeter le meme concept.",
+		Description: "Détermine la prochaine activité optimale pour l'apprenant selon son état cognitif. Tient compte de la session en cours pour éviter de répéter le même concept.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, params GetNextActivityParams) (*mcp.CallToolResult, any, error) {
 		learnerID, err := getLearnerID(ctx)
 		if err != nil {
@@ -39,8 +39,8 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 				"needs_domain_setup": true,
 				"activity": models.Activity{
 					Type:         models.ActivitySetupDomain,
-					Rationale:    "aucun domaine configure",
-					PromptForLLM: "L'apprenant n'a pas encore de domaine. Analyse son objectif, decompose-le en concepts et appelle init_domain().",
+					Rationale:    "aucun domaine configuré",
+					PromptForLLM: "L'apprenant n'a pas encore de domaine. Analyse son objectif, décompose-le en concepts et appelle init_domain().",
 				},
 			})
 			return r, nil, nil
@@ -187,7 +187,7 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 		case "scaffolding":
 			activity.DifficultyTarget *= 0.75
 		case "recontextualize":
-			activity.Rationale += " · recontextualisation demandee"
+			activity.Rationale += " · recontextualisation demandée"
 		}
 
 		// Apply calibration bias adjustment
@@ -222,7 +222,7 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 						misconceptionPrompt += " — " + m.LastErrorDetail
 					}
 				}
-				misconceptionPrompt += ". Cible ces confusions dans ton explication et ton exercice. Ne mentionne pas explicitement les misconceptions — concois l'exercice pour qu'il les confronte naturellement."
+				misconceptionPrompt += ". Cible ces confusions dans ton explication et ton exercice. Ne mentionne pas explicitement les misconceptions — conçois l'exercice pour qu'il les confronte naturellement."
 				activity.PromptForLLM += misconceptionPrompt
 			}
 
