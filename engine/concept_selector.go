@@ -5,7 +5,6 @@
 // Package engine — [4] ConceptSelector.
 //
 // SelectConcept is component [4] of the regulation pipeline (see
-// docs/regulation-architecture.md §3 [4] and
 // docs/regulation-design/04-concept-selector.md). It is a (quasi-)pure
 // function that, given a phase, the learner's per-concept state, the
 // domain graph, and a goal_relevance vector, decides *which concept*
@@ -16,10 +15,12 @@
 // LLM-driven decomposition contract. If the LLM's decomposition is
 // wrong (or absent), [4] reveals it: routing is observably degraded.
 //
-// SelectConcept is created and unit-tested in this PR but is not yet
-// wired into the runtime; the wiring is deferred to PR [2] alongside
-// the orchestrator. REGULATION_CONCEPT=on currently only gates the
-// system-prompt documentation (see tools/prompt.go).
+// Wired into the runtime by engine.Orchestrate (see orchestrator.go),
+// which is the path taken by tools/activity.go when REGULATION_PHASE
+// is not "off" (default-on). The standalone REGULATION_CONCEPT flag
+// only toggles the system-prompt documentation appendix in
+// tools/prompt.go — the selector itself runs as part of the
+// orchestrator regardless.
 package engine
 
 import (

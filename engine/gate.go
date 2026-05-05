@@ -5,7 +5,6 @@
 // Package engine — [3] Gate Controller.
 //
 // ApplyGate is component [3] of the regulation pipeline (see
-// docs/regulation-architecture.md §3 [3] and
 // docs/regulation-design/03-gate-controller.md). It runs *before*
 // [4] ConceptSelector and [5] ActionSelector at execution time:
 // filters the candidate pool, restricts allowed actions per concept
@@ -17,10 +16,11 @@
 // slog.Info on the misconception+unsatisfied-prereqs pathological case
 // (cf. OQ-3.5 sub-b — surfaced for statistical analysis, not blocked).
 //
-// Created and unit-tested in this PR but not yet wired into the
-// runtime; the wiring is deferred to PR [2] (orchestrator).
-// REGULATION_GATE=on currently only gates the system-prompt
-// documentation appendix (see tools/prompt.go).
+// Wired into the runtime by engine.Orchestrate (see orchestrator.go),
+// which is the path taken by tools/activity.go when REGULATION_PHASE
+// is not "off" (default-on). The standalone REGULATION_GATE flag only
+// toggles the system-prompt documentation appendix in tools/prompt.go;
+// the gate itself runs as part of the orchestrator regardless.
 package engine
 
 import (

@@ -5,21 +5,24 @@
 // Package engine — [5] ActionSelector.
 //
 // SelectAction is component [5] of the regulation pipeline (see
-// docs/regulation-architecture.md §3 [5] and
 // docs/regulation-design/05-action-selector.md). It is a pure function
 // that, given a concept already chosen by the caller, decides *what to
 // do on it*: which ActivityType, with which DifficultyTarget.
 //
 // It does not consume goal_relevance, phase, autonomy or session
 // history — those are upstream concerns belonging to [1], [2], [4]
-// and [3] respectively. This isolation is contractual: when [4]
-// ConceptSelector lands, SelectAction works unchanged.
+// and [3] respectively. This isolation is contractual: SelectConcept
+// can change without affecting SelectAction.
 //
-// The function is created and unit-tested in this PR but is not yet
-// wired into the legacy router (engine/router.go); the wiring is
-// deferred to PR [2] so the migration of the router can land alongside
-// the orchestrator. REGULATION_ACTION=on currently only gates the
-// system-prompt documentation (see tools/prompt.go).
+// Wired into the runtime by engine.Orchestrate (see orchestrator.go),
+// which is the path taken by tools/activity.go when REGULATION_PHASE
+// is not "off" (default-on). The standalone REGULATION_ACTION flag
+// only toggles the system-prompt documentation appendix in
+// tools/prompt.go — the selector itself runs as part of the
+// orchestrator regardless. The legacy engine.Route does NOT call
+// SelectAction; it only runs when REGULATION_PHASE=off or when the
+// orchestrator returns an error and the auto-fallback in
+// tools/activity.go kicks in.
 package engine
 
 import (
