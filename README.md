@@ -88,7 +88,7 @@ On top of the legacy alert-and-router engine, v0.3 introduces a seven-stage **re
 | **[2]** | Phase Controller (`engine/orchestrator.go` + `engine/phase_fsm.go`) | **Shipped** (opt-in) | Pure-FSM orchestrator wiring [4]→[5]→[3]. Transitions are observation-driven: DIAGNOSTIC→INSTRUCTION on entropy reduction *ΔH ≥ 0.2 bits* or *N ≥ 8* diagnostic items; INSTRUCTION→MAINTENANCE on full-graph mastery; MAINTENANCE→INSTRUCTION on FSRS retention drop. Flag: `REGULATION_PHASE=on`. |
 | **[6]** | Fade Controller | **Pending** | Gradual handover of pacing decisions to the learner once autonomy thresholds are met. Not implemented yet. |
 
-The pure functions (`SelectAction`, `SelectConcept`, `ApplyGate`, `EvaluatePhase`) are individually unit-tested (~90 dedicated tests). The orchestrator is exercised by SQLite in-memory tests, three end-to-end scenarios with JSON+Markdown evidence artifacts in [`eval/orchestrator_e2e_*`](./eval/), and migration safety tests for the new `domains.phase`, `domains.phase_changed_at`, `domains.phase_entry_entropy` columns.
+The pure functions (`SelectAction`, `SelectConcept`, `ApplyGate`, `EvaluatePhase`) are individually unit-tested (~90 dedicated tests). The orchestrator is exercised by SQLite in-memory tests and migration safety tests for the new `domains.phase`, `domains.phase_changed_at`, `domains.phase_entry_entropy` columns.
 
 ### Feature flags — strict-equality opt-in
 
@@ -273,8 +273,7 @@ main.go              HTTP server, MCP handler, OAuth, scheduler startup
 │   ├── phase.go                     Phase transitions, action history, anti-repeat queries
 │   ├── schema.sql                   Table definitions (embedded)
 │   └── migrations.go                Idempotent migrations for existing databases
-├── tools/                30 MCP tool handlers + system prompt + flag-gated appendices
-└── eval/                 Synthetic-learner harness (V1–V4) + orchestrator E2E scenarios
+└── tools/                30 MCP tool handlers + system prompt + flag-gated appendices
 ```
 
 ## Running
@@ -441,38 +440,7 @@ The figures below include a safety buffer (~50%) against the theoretical limits.
 - **SQLite** (via modernc.org/sqlite — pure Go, no CGO)
 - **JWT** for access tokens, bcrypt for passwords
 - **robfig/cron** for background scheduling
-- **800+ tests** covering the five algorithms, the regulation pipeline (action / concept / gate / phase-FSM / orchestrator), legacy router and alert engine, motivation selection, misconception aggregation, OLM snapshots, goal-relevance staleness, schema migrations, and end-to-end orchestrator scenarios
-
-## Pedagogical Validity — Current Status
-
-Tutor MCP ships a **synthetic-learner harness** (`eval/`) that replays
-each release against four pedagogical viability properties (V1–V4 :
-BKT calibration, ranking, routing-vs-random uplift, FSRS scheduling).
-The latest harness run is recorded in [`eval/VERDICT.md`](./eval/VERDICT.md).
-
-As of v0.2 (run 2026-05-03), the synthetic harness reports
-**NOT VIABLE — V1, V2, V3, V4 fail** at the bars set by the project
-itself, with V1′ (calibration on concepts seen ≥3 times) passing. The
-runtime closes ~72 % of the gap between random routing and the
-super-oracle on V3 (mean snapshot mastery uplift). Caveats from
-`eval/VERDICT.md` apply : synthetic learners only, no real-human data,
-borderline verdicts deserve bootstrap CI before being treated as
-final.
-
-For the v0.3 regulation pipeline, three end-to-end orchestrator
-scenarios (full-cycle, restrictive-goal, broad-goal) have been
-recorded as JSON+Markdown artifacts in
-[`eval/orchestrator_e2e_*_2026-05-05.{json,md}`](./eval/) — they
-exercise the complete `init_domain` → DIAGNOSTIC → INSTRUCTION →
-MAINTENANCE arc against an in-memory SQLite store with a deterministic
-synthetic learner, and stand as evidence that the FSM transitions and
-gate escapes behave as specified. They are *not* a substitute for the
-V1–V4 harness rerun, which remains the next chantier alongside
-real-human data.
-
-This honest status is part of the project. The runtime is published
-as an open instrument — the methodology is reproducible, the bars are
-explicit, and the gap to viability is measurable.
+- Wide test coverage across the five algorithms, the regulation pipeline (action / concept / gate / phase-FSM / orchestrator), legacy router and alert engine, motivation selection, misconception aggregation, OLM snapshots, goal-relevance staleness, and schema migrations
 
 ## License
 

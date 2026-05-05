@@ -10,12 +10,19 @@ data/
 # Binary
 tutor-mcp
 learning-runtime
-eval/persona/bin/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 
-# Superpowers internal docs
+# Internal docs — never commit
 docs/superpowers/
+docs/audit-report.md
+docs/audit-scope.md
+
+# Synthetic-learner harness — keep local
+eval/
+
+# Internal security tracking — never commit
+security-todo.md
