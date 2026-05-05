@@ -246,17 +246,81 @@ func registerGetNextActivity(server *mcp.Server, deps *Deps) {
 			plateauActive, len(sessionConcepts),
 		)
 
-		r, _ := jsonResult(map[string]any{
+		// [6] FadeController — post-decision module gated on
+		// REGULATION_FADE=on (default OFF). Maps autonomy
+		// score+trend to handover params (verbosity, webhook
+		// cadence, ZPD aggressiveness, proactive review). When
+		// the flag is OFF, the result JSON is byte-identical to
+		// the pre-fade behaviour: no fade_params key, no mutation
+		// of motivation_brief. See
+		// docs/regulation-design/06-fade-controller.md.
+		extra := map[string]any{}
+		if regulationFadeEnabled() {
+			autonomyMetrics := engine.ComputeAutonomyMetrics(engine.AutonomyInput{
+				Interactions:    allInteractions,
+				ConceptStates:   domainStates,
+				CalibrationBias: calibBias,
+				SessionGap:      2 * time.Hour,
+			})
+			trend := engine.AutonomyTrend(engine.ComputeAutonomyTrendExported(autonomyScores))
+			fadeParams := engine.Decide(autonomyMetrics.Score, trend)
+			motivationBrief = applyFadeToMotivation(motivationBrief, fadeParams.HintLevel)
+			extra["fade_params"] = fadeParams
+			extra["autonomy_score"] = autonomyMetrics.Score
+			extra["autonomy_trend"] = string(trend)
+		}
+
+		out := map[string]any{
 			"needs_domain_setup":        false,
 			"domain_id":                 domain.ID,
 			"activity":                  activity,
 			"session_concepts_done":     len(sessionConcepts),
 			"metacognitive_mirror":      mirror,
-			"tutor_mode":               tutorMode,
+			"tutor_mode":                tutorMode,
 			"active_misconceptions":     activeMisconceptions,
 			"known_misconception_types": knownMisconceptionTypes,
 			"motivation_brief":          motivationBrief,
-		})
+		}
+		for k, v := range extra {
+			out[k] = v
+		}
+		r, _ := jsonResult(out)
 		return r, nil, nil
 	})
+}
+
+// applyFadeToMotivation modulates a MotivationBrief based on the fade
+// HintLevel. The contract:
+//
+//   - HintLevelFull    : brief returned unchanged (legacy behaviour).
+//   - HintLevelPartial : Instruction is collapsed to a one-line
+//     concise form; structured fields (ValueFraming, ProgressDelta,
+//     etc.) are preserved so the LLM still has the context to weave
+//     in if it chooses, but the explicit phrasing guidance is shorter.
+//   - HintLevelNone    : Kind is cleared and Instruction is emptied.
+//     Per the system prompt, kind == "" means "no motivational
+//     preamble". Structured fields are also cleared to make the
+//     suppression unambiguous on the wire.
+//
+// Returns brief unchanged if it's nil or already silent (kind == "").
+func applyFadeToMotivation(brief *models.MotivationBrief, level engine.HintLevel) *models.MotivationBrief {
+	if brief == nil {
+		return brief
+	}
+	switch level {
+	case engine.HintLevelNone:
+		return &models.MotivationBrief{Kind: "", Instruction: ""}
+	case engine.HintLevelPartial:
+		if brief.Kind == "" {
+			return brief
+		}
+		// Replace the verbose tutor-direction Instruction with a
+		// terse one-liner. The kind + structured fields stay so
+		// downstream context is preserved.
+		clone := *brief
+		clone.Instruction = "Bref. Reste minimal."
+		return &clone
+	default: // HintLevelFull
+		return brief
+	}
 }
